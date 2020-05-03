@@ -5,7 +5,9 @@ module TestJourney exposing
     , finish
     , handleEffect
     , input
+    , mapModel
     , see
+    , seeText
     , start
     )
 
@@ -15,6 +17,7 @@ import Html
 import Json.Encode
 import Test.Html.Event as Event
 import Test.Html.Query as Query
+import Test.Html.Selector as Selector
 import Test.Runner
 import Test.Runner.Failure
 import TestJourney.Page as Page
@@ -64,12 +67,20 @@ failureToExpectation f =
 
 see : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
-    staticStep "see" (seeStep finder)
+    staticStep ("see " ++ Page.finderFriendlyName finder) (seeStep finder)
+
+
+seeText : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+seeText expectText finder =
+    staticStep ("seeText \"" ++ expectText ++ "\" at " ++ Page.finderFriendlyName finder)
+        (seeStep
+            (finder ++ [ Page.FinderPartSingle "" (Page.SelectorSingle [ Selector.text expectText ]) ])
+        )
 
 
 dontSee : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
-    staticStep "dontSee" (dontSeeStep finder)
+    staticStep ("dontSee " ++ Page.finderFriendlyName finder) (dontSeeStep finder)
 
 
 resolveFinder : Page.Finder -> Query.Single msg -> Result Failure (Query.Single msg)
@@ -80,7 +91,7 @@ resolveFinder finder query =
                 |> Result.andThen
                     (\parent ->
                         case finderPart of
-                            Page.FinderPartSingle (Page.SelectorSingle selector) ->
+                            Page.FinderPartSingle _ (Page.SelectorSingle selector) ->
                                 let
                                     failure =
                                         parent
@@ -94,7 +105,7 @@ resolveFinder finder query =
                                     Just f ->
                                         Err f
 
-                            Page.FinderPartMultiple (Page.SelectorMultiple selector) index ->
+                            Page.FinderPartMultiple _ (Page.SelectorMultiple selector) index ->
                                 let
                                     failure =
                                         parent
@@ -167,11 +178,11 @@ dontSeeChildStep parentFinder childFinder program =
     case parentResult of
         Ok parent ->
             case childFinder of
-                Page.FinderPartSingle (Page.SelectorSingle selector) ->
+                Page.FinderPartSingle _ (Page.SelectorSingle selector) ->
                     parent
                         |> Query.hasNot selector
 
-                Page.FinderPartMultiple (Page.SelectorMultiple selector) index ->
+                Page.FinderPartMultiple _ (Page.SelectorMultiple selector) index ->
                     parent
                         |> Query.findAll selector
                         |> Query.index index
@@ -198,7 +209,7 @@ dontSeeChildStep parentFinder childFinder program =
 
 click : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 click finder =
-    step "click" (simulateEventStep Event.click finder)
+    step ("click " ++ Page.finderFriendlyName finder) (simulateEventStep Event.click finder)
 
 
 input : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
@@ -286,6 +297,7 @@ handleEffectStep fn program =
 type alias ProgramDefinition model effect msg =
     { view : model -> Browser.Document msg
     , update : msg -> model -> ( model, List effect )
+    , initialModel : model
     , subscriptions : model -> Sub msg
     , debugToString : effect -> String
     }
@@ -299,13 +311,18 @@ type alias ProgramState model effect msg =
     }
 
 
-start : ProgramDefinition model effect msg -> model -> ProgramState model effect msg
-start programDefinition model =
-    { model = model
+start : ProgramDefinition model effect msg -> ProgramState model effect msg
+start programDefinition =
+    { model = programDefinition.initialModel
     , definition = programDefinition
     , pendingEffects = []
     , result = Ok []
     }
+
+
+mapModel : (model -> model) -> ProgramState model effect msg -> ProgramState model effect msg
+mapModel fn program =
+    { program | model = fn program.model }
 
 
 failureWithStepsDescription :

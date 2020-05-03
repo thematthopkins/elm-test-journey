@@ -229,7 +229,7 @@ update msg model =
 
 viewItem : TodoItem -> Html TodoItemMsg
 viewItem item =
-    div []
+    div [ attribute "data-test" "todo-item" ]
         [ input
             [ type_ "checkbox"
             , checked (item.status == TodoItemComplete)
@@ -245,7 +245,7 @@ viewItem item =
                 )
             ]
             []
-        , span []
+        , span [ attribute "data-test" "item-label" ]
             [ text item.label
             ]
         , button [ onClick Remove ]
