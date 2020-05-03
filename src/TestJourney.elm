@@ -2,7 +2,6 @@ module TestJourney exposing
     ( ProgramDefinition
     , click
     , dontSee
-    , findSingle
     , finish
     , handleEffect
     , input
@@ -16,9 +15,9 @@ import Html
 import Json.Encode
 import Test.Html.Event as Event
 import Test.Html.Query as Query
-import Test.Html.Selector as Selector
 import Test.Runner
 import Test.Runner.Failure
+import TestJourney.Page as Page
 
 
 type alias Failure =
@@ -63,47 +62,25 @@ failureToExpectation f =
     Expect.fail (Test.Runner.Failure.format f.description f.reason)
 
 
-type SelectorMultiple
-    = SelectorMultiple (List Selector.Selector)
-
-
-type SelectorSingle
-    = SelectorSingle (List Selector.Selector)
-
-
-type FinderPart
-    = FinderPartSingle SelectorSingle
-    | FinderPartMultiple SelectorMultiple Int
-
-
-type alias Finder =
-    List FinderPart
-
-
-findSingle : List Selector.Selector -> Finder
-findSingle selector =
-    [ FinderPartSingle (SelectorSingle selector) ]
-
-
-see : Finder -> ProgramState model effect msg -> ProgramState model effect msg
+see : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
     staticStep "see" (seeStep finder)
 
 
-dontSee : Finder -> ProgramState model effect msg -> ProgramState model effect msg
+dontSee : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
     staticStep "dontSee" (dontSeeStep finder)
 
 
-resolveFinder : Finder -> Query.Single msg -> Result Failure (Query.Single msg)
-resolveFinder finder single =
+resolveFinder : Page.Finder -> Query.Single msg -> Result Failure (Query.Single msg)
+resolveFinder finder query =
     List.foldl
         (\finderPart parentResult ->
             parentResult
                 |> Result.andThen
                     (\parent ->
                         case finderPart of
-                            FinderPartSingle (SelectorSingle selector) ->
+                            Page.FinderPartSingle (Page.SelectorSingle selector) ->
                                 let
                                     failure =
                                         parent
@@ -117,7 +94,7 @@ resolveFinder finder single =
                                     Just f ->
                                         Err f
 
-                            FinderPartMultiple (SelectorMultiple selector) index ->
+                            Page.FinderPartMultiple (Page.SelectorMultiple selector) index ->
                                 let
                                     failure =
                                         parent
@@ -136,11 +113,11 @@ resolveFinder finder single =
                                         Err f
                     )
         )
-        (Ok single)
+        (Ok query)
         finder
 
 
-seeStep : Finder -> ProgramState model effect msg -> Expect.Expectation
+seeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
 seeStep finder program =
     program.model
         |> program.definition.view
@@ -158,7 +135,7 @@ seeStep finder program =
            )
 
 
-dontSeeStep : Finder -> ProgramState model effect msg -> Expect.Expectation
+dontSeeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
 dontSeeStep finder program =
     finder
         |> List.reverse
@@ -176,7 +153,7 @@ dontSeeStep finder program =
            )
 
 
-dontSeeChildStep : Finder -> FinderPart -> ProgramState model effect msg -> Expect.Expectation
+dontSeeChildStep : Page.Finder -> Page.FinderPart -> ProgramState model effect msg -> Expect.Expectation
 dontSeeChildStep parentFinder childFinder program =
     let
         parentResult =
@@ -190,11 +167,11 @@ dontSeeChildStep parentFinder childFinder program =
     case parentResult of
         Ok parent ->
             case childFinder of
-                FinderPartSingle (SelectorSingle selector) ->
+                Page.FinderPartSingle (Page.SelectorSingle selector) ->
                     parent
                         |> Query.hasNot selector
 
-                FinderPartMultiple (SelectorMultiple selector) index ->
+                Page.FinderPartMultiple (Page.SelectorMultiple selector) index ->
                     parent
                         |> Query.findAll selector
                         |> Query.index index
@@ -219,12 +196,12 @@ dontSeeChildStep parentFinder childFinder program =
             failureToExpectation failure
 
 
-click : Finder -> ProgramState model effect msg -> ProgramState model effect msg
+click : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 click finder =
     step "click" (simulateEventStep Event.click finder)
 
 
-input : String -> Finder -> ProgramState model effect msg -> ProgramState model effect msg
+input : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 input text finder =
     step ("input \"" ++ text ++ "\"") (simulateEventStep (Event.input text) finder)
 
@@ -253,7 +230,7 @@ type alias StaticStep model effect msg =
     ProgramState model effect msg -> Expect.Expectation
 
 
-simulateEventStep : ( String, Json.Encode.Value ) -> Finder -> Step model effect msg
+simulateEventStep : ( String, Json.Encode.Value ) -> Page.Finder -> Step model effect msg
 simulateEventStep event finder program =
     program.model
         |> program.definition.view
@@ -281,7 +258,7 @@ simulateEventStep event finder program =
 handleEffectStep : (effect -> Maybe ( msg, Expect.Expectation )) -> Step model effect msg
 handleEffectStep fn program =
     case program.pendingEffects of
-        effect :: remainingEffects ->
+        effect :: _ ->
             let
                 result =
                     fn effect
@@ -337,10 +314,6 @@ failureWithStepsDescription :
     -> Failure
     -> Failure
 failureWithStepsDescription passedSteps failedStep failure =
-    let
-        _ =
-            Debug.log "steps: " passedSteps
-    in
     passedSteps
         |> List.map (\s -> "[Passed] " ++ s)
         |> (\l -> l ++ [ "[Failed] " ++ failedStep ++ ":\n" ++ failure.description ])
@@ -362,7 +335,7 @@ staticStep stepDescription currentStep programState =
 step : StepDescription -> Step model effect msg -> ProgramState model effect msg -> ProgramState model effect msg
 step stepDescription currentStep programState =
     case programState.result of
-        Err e ->
+        Err _ ->
             programState
 
         Ok stepsProcessed ->

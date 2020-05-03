@@ -1,3 +1,5 @@
+// the presence of this file make the elm language server have trouble
+// keeping this out of the mix until things settle down
 {
     "type": "package",
     "name": "thematthopkins/elm-test-journey",

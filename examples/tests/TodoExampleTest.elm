@@ -3,9 +3,9 @@ module TodoExampleTest exposing (suite)
 import Expect
 import Html.Attributes exposing (..)
 import Test exposing (..)
-import Test.Html.Selector as Selector
 import TestJourney as J
 import TodoExample
+import TodoExamplePage exposing (page)
 
 
 program : J.ProgramDefinition TodoExample.Model (TodoExample.Effect TodoExample.Msg) TodoExample.Msg
@@ -23,10 +23,10 @@ suite =
         [ test "Add Item" <|
             \_ ->
                 J.start program TodoExample.emptyModel
-                    |> J.input "myNewItem" (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-text") ])
-                    |> J.dontSee (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-loader") ])
-                    |> J.click (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-button") ])
-                    |> J.see (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-loader") ])
+                    |> J.input "myNewItem" page.addItemTextInput
+                    |> J.dontSee page.addItemLoader
+                    |> J.click page.addItemButton
+                    |> J.see page.addItemLoader
                     |> J.handleEffect
                         (\effect ->
                             case effect of
@@ -39,7 +39,7 @@ suite =
                                 _ ->
                                     Nothing
                         )
-                    |> J.dontSee (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-loader") ])
-                    |> J.see (J.findSingle [ Selector.attribute (attribute "data-test" "add-item-button") ])
+                    |> J.dontSee page.addItemLoader
+                    |> J.see page.addItemButton
                     |> J.finish
         ]
