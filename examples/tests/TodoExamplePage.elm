@@ -14,7 +14,8 @@ page =
             (\item ->
                 { self = item
                 , label = P.singleTestAttr item "item-label"
-                , remove = P.singleTestAttr item "item-remove"
+                , removeButton = P.singleTestAttr item "item-remove-button"
+                , removeProcessing = P.singleTestAttr item "item-remove-processing"
                 , complete = P.singleTestAttr item "item-complete"
                 }
             )

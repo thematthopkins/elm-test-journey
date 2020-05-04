@@ -3,6 +3,7 @@ module TodoExample exposing
     , Model
     , Msg(..)
     , TodoItemID(..)
+    , TodoItemStatus(..)
     , emptyModel
     , main
     , subscriptions
@@ -248,9 +249,15 @@ viewItem item =
         , span [ attribute "data-test" "item-label" ]
             [ text item.label
             ]
-        , button [ onClick Remove ]
-            [ text "Remove"
-            ]
+        , if item.isRemoving then
+            span [ attribute "data-test" "item-remove-processing" ]
+                [ text "removing..."
+                ]
+
+          else
+            button [ attribute "data-test" "item-remove-button", onClick Remove ]
+                [ text "Remove"
+                ]
         ]
 
 

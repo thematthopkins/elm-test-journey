@@ -46,30 +46,44 @@ suite =
                     |> J.see (page.items 0 |> .self)
                     |> J.seeText "myNewItem" (page.items 0 |> .label)
                     |> J.finish
-        , test "Add Item 2" <|
+        , test "Remove Item" <|
             \_ ->
                 J.start program
                     |> J.mapModel
                         (\m ->
-                            m
+                            { m
+                                | items =
+                                    [ { id = TodoExample.TodoItemID 22
+                                      , label = "My Item To Remain"
+                                      , status = TodoExample.TodoItemIncomplete
+                                      , isRemoving = False
+                                      }
+                                    , { id = TodoExample.TodoItemID 23
+                                      , label = "My Item To Remove"
+                                      , status = TodoExample.TodoItemIncomplete
+                                      , isRemoving = False
+                                      }
+                                    ]
+                            }
                         )
-                    |> J.input "myNewItem" page.addItemTextInput
-                    |> J.dontSee page.addItemLoader
-                    |> J.click page.addItemButton
-                    |> J.see page.addItemLoader
+                    |> J.seeCount 2 page.items
+                    |> J.seeText "My Item To Remove" (page.items 1 |> .label)
+                    |> J.dontSee (page.items 1 |> .removeProcessing)
+                    |> J.click (page.items 1 |> .removeButton)
+                    |> J.see (page.items 1 |> .removeProcessing)
                     |> J.handleEffect
                         (\effect ->
                             case effect of
-                                TodoExample.EffectAddItem msg input ->
+                                TodoExample.EffectRemoveItem msg id ->
                                     Just
-                                        ( msg (Ok (TodoExample.TodoItemID 55))
-                                        , Expect.equal input "myNewItem"
+                                        ( msg (Ok ())
+                                        , Expect.equal id (TodoExample.TodoItemID 23)
                                         )
 
                                 _ ->
                                     Nothing
                         )
-                    |> J.dontSee page.addItemLoader
-                    |> J.see page.addItemButton
+                    |> J.seeCount 1 page.items
+                    |> J.seeText "My Item To Remain" (page.items 0 |> .label)
                     |> J.finish
         ]
