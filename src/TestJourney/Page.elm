@@ -1,5 +1,6 @@
 module TestJourney.Page exposing
-    ( Finder
+    ( Element
+    , Finder
     , multiple
     , multipleRecord
     , multipleRecordTestAttr
@@ -20,19 +21,23 @@ type alias Finder =
     Internal.Finder
 
 
+type alias Element children =
+    { children | self : Finder }
+
+
 root : Finder
 root =
     Internal.Finder []
 
 
-single : Finder -> FriendlyName -> List Selector.Selector -> Finder
+single : Finder -> FriendlyName -> List Selector.Selector -> Element {}
 single (Internal.Finder parent) friendlyName selector =
+    { self = Internal.Finder (parent ++ [ FinderPartSingle friendlyName selector ]) }
+
+
+singleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> Element children) -> Element children
+singleRecord (Internal.Finder parent) friendlyName selector fn =
     Internal.Finder (parent ++ [ FinderPartSingle friendlyName selector ])
-
-
-singleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> element) -> element
-singleRecord parent friendlyName selector fn =
-    single parent friendlyName selector
         |> fn
 
 
@@ -41,7 +46,13 @@ multiple (Internal.Finder parent) friendlyName selector index =
     Internal.Finder (parent ++ [ FinderPartMultiple friendlyName selector index ])
 
 
-multipleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> element) -> Int -> element
+multipleRecord :
+    Finder
+    -> FriendlyName
+    -> List Selector.Selector
+    -> (Finder -> Element children)
+    -> Int
+    -> Element children
 multipleRecord parent friendlyName selector fn index =
     multiple parent friendlyName selector index
         |> fn
@@ -53,12 +64,12 @@ testAttrSelector testAttrVal =
     ]
 
 
-singleTestAttr : Finder -> String -> Finder
+singleTestAttr : Finder -> String -> Element {}
 singleTestAttr parent testAttr =
     single parent testAttr (testAttrSelector testAttr)
 
 
-singleRecordTestAttr : Finder -> String -> (Finder -> element) -> element
+singleRecordTestAttr : Finder -> String -> (Finder -> Element children) -> Element children
 singleRecordTestAttr parent testAttr fn =
     singleRecord parent testAttr (testAttrSelector testAttr) fn
 
@@ -68,6 +79,6 @@ multipleTestAttr parent testAttr index =
     multiple parent testAttr (testAttrSelector testAttr) index
 
 
-multipleRecordTestAttr : Finder -> String -> (Finder -> element) -> Int -> element
+multipleRecordTestAttr : Finder -> String -> (Finder -> Element children) -> Int -> Element children
 multipleRecordTestAttr parent testAttr fn index =
     multipleRecord parent testAttr (testAttrSelector testAttr) fn index

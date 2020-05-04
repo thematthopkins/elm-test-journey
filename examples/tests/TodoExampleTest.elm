@@ -47,7 +47,7 @@ suite =
                     |> J.dontSee page.addItemLoader
                     |> J.see page.addItemButton
                     |> J.seeCount 1 page.items
-                    |> J.see (page.items 0 |> .self)
+                    |> J.see (page.items 0)
                     |> J.seeText "myNewItem" (page.items 0 |> .label)
                     |> J.finish
         , test "Remove Item" <|

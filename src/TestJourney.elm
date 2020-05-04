@@ -111,7 +111,7 @@ failureToExpectation f =
     Expect.fail (Test.Runner.Failure.format f.description f.reason)
 
 
-seeCount : Int -> (Int -> { a | self : Finder }) -> ProgramState model effect msg -> ProgramState model effect msg
+seeCount : Int -> (Int -> Page.Element children) -> ProgramState model effect msg -> ProgramState model effect msg
 seeCount expectedCount finderFn model =
     let
         (Finder finder) =
@@ -177,13 +177,17 @@ seeCountStep expectedCount parentFinder lastFinderPart program =
         |> resultToExpectation
 
 
-see : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+see : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
-    staticStep ("see " ++ finderFriendlyName finder) (seeStep finder)
+    staticStep ("see " ++ finderFriendlyName finder.self) (seeStep finder.self)
 
 
-seeText : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
-seeText expectText (Finder finder) =
+seeText : String -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+seeText expectText element =
+    let
+        (Finder finder) =
+            element.self
+    in
     staticStep ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
         (seeStep
             (Finder
@@ -192,9 +196,9 @@ seeText expectText (Finder finder) =
         )
 
 
-dontSee : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+dontSee : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
-    staticStep ("dontSee " ++ finderFriendlyName finder) (dontSeeStep finder)
+    staticStep ("dontSee " ++ finderFriendlyName finder.self) (dontSeeStep finder.self)
 
 
 resolveFinder : Page.Finder -> Query.Single msg -> Result Failure (Query.Single msg)
@@ -338,7 +342,7 @@ type alias StaticStep model effect msg =
     ProgramState model effect msg -> Expect.Expectation
 
 
-simulateEventStep : ( String, Json.Encode.Value ) -> Page.Finder -> Step model effect msg
+simulateEventStep : ( String, Json.Encode.Value ) -> Finder -> Step model effect msg
 simulateEventStep event finder program =
     program.model
         |> program.definition.view
@@ -509,91 +513,91 @@ finish program =
 -- Events
 
 
-click : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+click : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 click finder =
-    step ("click " ++ finderFriendlyName finder)
-        (simulateEventStep Event.click finder)
+    step ("click " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.click finder.self)
 
 
-input : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+input : String -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 input text finder =
-    step ("input \"" ++ text ++ "\" on " ++ finderFriendlyName finder)
-        (simulateEventStep (Event.input text) finder)
+    step ("input \"" ++ text ++ "\" on " ++ finderFriendlyName finder.self)
+        (simulateEventStep (Event.input text) finder.self)
 
 
-custom : String -> Json.Encode.Value -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+custom : String -> Json.Encode.Value -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 custom eventName value finder =
-    step ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ finderFriendlyName finder)
-        (simulateEventStep (Event.custom eventName value) finder)
+    step ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ finderFriendlyName finder.self)
+        (simulateEventStep (Event.custom eventName value) finder.self)
 
 
-doubleClick : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+doubleClick : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 doubleClick finder =
-    step ("doubleClick " ++ finderFriendlyName finder)
-        (simulateEventStep Event.doubleClick finder)
+    step ("doubleClick " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.doubleClick finder.self)
 
 
-mouseDown : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseDown : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseDown finder =
-    step ("mouseDown " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseDown finder)
+    step ("mouseDown " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseDown finder.self)
 
 
-mouseUp : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseUp : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseUp finder =
-    step ("mouseUp " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseUp finder)
+    step ("mouseUp " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseUp finder.self)
 
 
-mouseEnter : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseEnter : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseEnter finder =
-    step ("mouseEnter " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseEnter finder)
+    step ("mouseEnter " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseEnter finder.self)
 
 
-mouseLeave : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseLeave : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseLeave finder =
-    step ("mouseLeave " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseLeave finder)
+    step ("mouseLeave " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseLeave finder.self)
 
 
-mouseOver : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseOver : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseOver finder =
-    step ("mouseOver " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseOver finder)
+    step ("mouseOver " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseOver finder.self)
 
 
-mouseOut : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+mouseOut : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 mouseOut finder =
-    step ("mouseOut " ++ finderFriendlyName finder)
-        (simulateEventStep Event.mouseOut finder)
+    step ("mouseOut " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.mouseOut finder.self)
 
 
-check : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+check : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 check finder =
-    step ("check " ++ finderFriendlyName finder)
-        (simulateEventStep (Event.check True) finder)
+    step ("check " ++ finderFriendlyName finder.self)
+        (simulateEventStep (Event.check True) finder.self)
 
 
-uncheck : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+uncheck : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 uncheck finder =
-    step ("uncheck " ++ finderFriendlyName finder)
-        (simulateEventStep (Event.check False) finder)
+    step ("uncheck " ++ finderFriendlyName finder.self)
+        (simulateEventStep (Event.check False) finder.self)
 
 
-submit : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+submit : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 submit finder =
-    step ("submit " ++ finderFriendlyName finder)
-        (simulateEventStep Event.submit finder)
+    step ("submit " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.submit finder.self)
 
 
-blur : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+blur : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 blur finder =
-    step ("blur " ++ finderFriendlyName finder)
-        (simulateEventStep Event.blur finder)
+    step ("blur " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.blur finder.self)
 
 
-focus : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
+focus : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 focus finder =
-    step ("focus " ++ finderFriendlyName finder)
-        (simulateEventStep Event.focus finder)
+    step ("focus " ++ finderFriendlyName finder.self)
+        (simulateEventStep Event.focus finder.self)
