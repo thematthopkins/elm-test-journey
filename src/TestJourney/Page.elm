@@ -1,9 +1,5 @@
 module TestJourney.Page exposing
     ( Finder
-    , FinderPart(..)
-    , SelectorMultiple(..)
-    , SelectorSingle(..)
-    , finderFriendlyName
     , multiple
     , multipleRecord
     , multipleRecordTestAttr
@@ -17,52 +13,21 @@ module TestJourney.Page exposing
 
 import Html.Attributes as Attributes
 import Test.Html.Selector as Selector
-
-
-type SelectorMultiple
-    = SelectorMultiple (List Selector.Selector)
-
-
-type SelectorSingle
-    = SelectorSingle (List Selector.Selector)
-
-
-type alias FriendlyName =
-    String
-
-
-type FinderPart
-    = FinderPartSingle FriendlyName SelectorSingle
-    | FinderPartMultiple FriendlyName SelectorMultiple Int
+import TestJourney.Internal as Internal exposing (FinderPart(..), FriendlyName)
 
 
 type alias Finder =
-    List FinderPart
+    Internal.Finder
 
 
 root : Finder
 root =
-    []
-
-
-finderFriendlyName : Finder -> String
-finderFriendlyName f =
-    f
-        |> List.map
-            (\part ->
-                case part of
-                    FinderPartSingle name _ ->
-                        name
-
-                    FinderPartMultiple name _ index ->
-                        name ++ "[" ++ String.fromInt index ++ "]"
-            )
-        |> String.join "."
+    Internal.Finder []
 
 
 single : Finder -> FriendlyName -> List Selector.Selector -> Finder
-single parent friendlyName selector =
-    parent ++ [ FinderPartSingle friendlyName (SelectorSingle selector) ]
+single (Internal.Finder parent) friendlyName selector =
+    Internal.Finder (parent ++ [ FinderPartSingle friendlyName selector ])
 
 
 singleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> element) -> element
@@ -72,8 +37,8 @@ singleRecord parent friendlyName selector fn =
 
 
 multiple : Finder -> FriendlyName -> List Selector.Selector -> Int -> Finder
-multiple parent friendlyName selector index =
-    parent ++ [ FinderPartMultiple friendlyName (SelectorMultiple selector) index ]
+multiple (Internal.Finder parent) friendlyName selector index =
+    Internal.Finder (parent ++ [ FinderPartMultiple friendlyName selector index ])
 
 
 multipleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> element) -> Int -> element

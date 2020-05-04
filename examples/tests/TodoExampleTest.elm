@@ -32,13 +32,17 @@ suite =
                         (\effect ->
                             case effect of
                                 TodoExample.EffectAddItem msg input ->
-                                    Just
-                                        ( msg (Ok (TodoExample.TodoItemID 55))
-                                        , Expect.equal input "myNewItem"
+                                    J.EffectProcessed
+                                        (Expect.equal
+                                            input
+                                            "myNewItem"
+                                        )
+                                        (msg
+                                            (Ok (TodoExample.TodoItemID 55))
                                         )
 
                                 _ ->
-                                    Nothing
+                                    J.EffectUnexpected
                         )
                     |> J.dontSee page.addItemLoader
                     |> J.see page.addItemButton
@@ -75,13 +79,17 @@ suite =
                         (\effect ->
                             case effect of
                                 TodoExample.EffectRemoveItem msg id ->
-                                    Just
-                                        ( msg (Ok ())
-                                        , Expect.equal id (TodoExample.TodoItemID 23)
+                                    J.EffectProcessed
+                                        (Expect.equal
+                                            id
+                                            (TodoExample.TodoItemID 23)
+                                        )
+                                        (msg
+                                            (Ok ())
                                         )
 
                                 _ ->
-                                    Nothing
+                                    J.EffectUnexpected
                         )
                     |> J.seeCount 1 page.items
                     |> J.seeText "My Item To Remain" (page.items 0 |> .label)

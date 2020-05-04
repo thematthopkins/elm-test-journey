@@ -1,5 +1,6 @@
 module TestJourney exposing
-    ( ProgramDefinition
+    ( EffectHandlerResult(..)
+    , ProgramDefinition
     , blur
     , check
     , click
@@ -34,7 +35,28 @@ import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import Test.Runner
 import Test.Runner.Failure
+import TestJourney.Internal exposing (Finder(..), FinderPart(..))
 import TestJourney.Page as Page
+
+
+type EffectHandlerResult msg
+    = EffectProcessed Expect.Expectation msg
+    | EffectUnexpected
+
+
+finderFriendlyName : Finder -> String
+finderFriendlyName (Finder f) =
+    f
+        |> List.map
+            (\part ->
+                case part of
+                    FinderPartSingle name _ ->
+                        name
+
+                    FinderPartMultiple name _ index ->
+                        name ++ "[" ++ String.fromInt index ++ "]"
+            )
+        |> String.join "."
 
 
 type alias Failure =
@@ -89,10 +111,10 @@ failureToExpectation f =
     Expect.fail (Test.Runner.Failure.format f.description f.reason)
 
 
-seeCount : Int -> (Int -> { a | self : Page.Finder }) -> ProgramState model effect msg -> ProgramState model effect msg
+seeCount : Int -> (Int -> { a | self : Finder }) -> ProgramState model effect msg -> ProgramState model effect msg
 seeCount expectedCount finderFn model =
     let
-        finder =
+        (Finder finder) =
             finderFn 0
                 |> .self
     in
@@ -106,25 +128,27 @@ seeCount expectedCount finderFn model =
                     List.reverse rest
             in
             case lastPart of
-                Page.FinderPartMultiple name (Page.SelectorMultiple selector) _ ->
+                FinderPartMultiple name selector _ ->
                     staticStep
                         ("seeCount "
                             ++ String.fromInt expectedCount
                             ++ " of "
-                            ++ Page.finderFriendlyName
-                                (parentFinder
-                                    ++ [ Page.FinderPartSingle name (Page.SelectorSingle selector) ]
+                            ++ finderFriendlyName
+                                (Finder
+                                    (parentFinder
+                                        ++ [ FinderPartSingle name selector ]
+                                    )
                                 )
                         )
-                        (seeCountStep expectedCount parentFinder (Page.SelectorMultiple selector))
+                        (seeCountStep expectedCount (Finder parentFinder) selector)
                         model
 
                 _ ->
                     { model | result = Err (failureFromDescription "Invalid single finder for seeCount") }
 
 
-seeCountStep : Int -> Page.Finder -> Page.SelectorMultiple -> ProgramState model effect msg -> Expect.Expectation
-seeCountStep expectedCount parentFinder (Page.SelectorMultiple lastFinderPart) program =
+seeCountStep : Int -> Page.Finder -> List Selector.Selector -> ProgramState model effect msg -> Expect.Expectation
+seeCountStep expectedCount parentFinder lastFinderPart program =
     program.model
         |> program.definition.view
         |> .body
@@ -155,31 +179,33 @@ seeCountStep expectedCount parentFinder (Page.SelectorMultiple lastFinderPart) p
 
 see : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
-    staticStep ("see " ++ Page.finderFriendlyName finder) (seeStep finder)
+    staticStep ("see " ++ finderFriendlyName finder) (seeStep finder)
 
 
 seeText : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
-seeText expectText finder =
-    staticStep ("seeText \"" ++ expectText ++ "\" at " ++ Page.finderFriendlyName finder)
+seeText expectText (Finder finder) =
+    staticStep ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
         (seeStep
-            (finder ++ [ Page.FinderPartSingle "" (Page.SelectorSingle [ Selector.text expectText ]) ])
+            (Finder
+                (finder ++ [ FinderPartSingle "" [ Selector.text expectText ] ])
+            )
         )
 
 
 dontSee : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
-    staticStep ("dontSee " ++ Page.finderFriendlyName finder) (dontSeeStep finder)
+    staticStep ("dontSee " ++ finderFriendlyName finder) (dontSeeStep finder)
 
 
 resolveFinder : Page.Finder -> Query.Single msg -> Result Failure (Query.Single msg)
-resolveFinder finder query =
+resolveFinder (Finder finder) query =
     List.foldl
         (\finderPart parentResult ->
             parentResult
                 |> Result.andThen
                     (\parent ->
                         case finderPart of
-                            Page.FinderPartSingle _ (Page.SelectorSingle selector) ->
+                            FinderPartSingle _ selector ->
                                 let
                                     failure =
                                         parent
@@ -193,7 +219,7 @@ resolveFinder finder query =
                                     Just f ->
                                         Err f
 
-                            Page.FinderPartMultiple _ (Page.SelectorMultiple selector) index ->
+                            FinderPartMultiple _ selector index ->
                                 let
                                     failure =
                                         parent
@@ -228,7 +254,7 @@ seeStep finder program =
 
 
 dontSeeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
-dontSeeStep finder program =
+dontSeeStep (Finder finder) program =
     finder
         |> List.reverse
         |> (\reversed ->
@@ -241,11 +267,11 @@ dontSeeStep finder program =
                             parentFinder =
                                 List.reverse rest
                         in
-                        dontSeeChildStep parentFinder lastFinder program
+                        dontSeeChildStep (Finder parentFinder) lastFinder program
            )
 
 
-dontSeeChildStep : Page.Finder -> Page.FinderPart -> ProgramState model effect msg -> Expect.Expectation
+dontSeeChildStep : Page.Finder -> FinderPart -> ProgramState model effect msg -> Expect.Expectation
 dontSeeChildStep parentFinder childFinder program =
     let
         parentResult =
@@ -259,11 +285,11 @@ dontSeeChildStep parentFinder childFinder program =
     case parentResult of
         Ok parent ->
             case childFinder of
-                Page.FinderPartSingle _ (Page.SelectorSingle selector) ->
+                FinderPartSingle _ selector ->
                     parent
                         |> Query.hasNot selector
 
-                Page.FinderPartMultiple _ (Page.SelectorMultiple selector) index ->
+                FinderPartMultiple _ selector index ->
                     parent
                         |> Query.findAll selector
                         |> Query.index index
@@ -288,7 +314,7 @@ dontSeeChildStep parentFinder childFinder program =
             failureToExpectation failure
 
 
-handleEffect : (effect -> Maybe ( msg, Expect.Expectation )) -> ProgramState model effect msg -> ProgramState model effect msg
+handleEffect : (effect -> EffectHandlerResult msg) -> ProgramState model effect msg -> ProgramState model effect msg
 handleEffect fn programState =
     let
         nextEffect =
@@ -337,7 +363,7 @@ simulateEventStep event finder program =
             )
 
 
-handleEffectStep : (effect -> Maybe ( msg, Expect.Expectation )) -> Step model effect msg
+handleEffectStep : (effect -> EffectHandlerResult msg) -> Step model effect msg
 handleEffectStep fn program =
     case program.pendingEffects of
         effect :: _ ->
@@ -346,7 +372,7 @@ handleEffectStep fn program =
                     fn effect
             in
             case result of
-                Just ( msg, expect ) ->
+                EffectProcessed expect msg ->
                     let
                         failure =
                             expectationToFailure expect
@@ -358,7 +384,7 @@ handleEffectStep fn program =
                         Nothing ->
                             Ok (program.definition.update msg program.model)
 
-                Nothing ->
+                EffectUnexpected ->
                     Err (failureFromDescription ("Unhandled effect: " ++ program.definition.debugToString effect))
 
         [] ->
@@ -485,89 +511,89 @@ finish program =
 
 click : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 click finder =
-    step ("click " ++ Page.finderFriendlyName finder)
+    step ("click " ++ finderFriendlyName finder)
         (simulateEventStep Event.click finder)
 
 
 input : String -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 input text finder =
-    step ("input \"" ++ text ++ "\" on " ++ Page.finderFriendlyName finder)
+    step ("input \"" ++ text ++ "\" on " ++ finderFriendlyName finder)
         (simulateEventStep (Event.input text) finder)
 
 
 custom : String -> Json.Encode.Value -> Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 custom eventName value finder =
-    step ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ Page.finderFriendlyName finder)
+    step ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ finderFriendlyName finder)
         (simulateEventStep (Event.custom eventName value) finder)
 
 
 doubleClick : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 doubleClick finder =
-    step ("doubleClick " ++ Page.finderFriendlyName finder)
+    step ("doubleClick " ++ finderFriendlyName finder)
         (simulateEventStep Event.doubleClick finder)
 
 
 mouseDown : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseDown finder =
-    step ("mouseDown " ++ Page.finderFriendlyName finder)
+    step ("mouseDown " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseDown finder)
 
 
 mouseUp : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseUp finder =
-    step ("mouseUp " ++ Page.finderFriendlyName finder)
+    step ("mouseUp " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseUp finder)
 
 
 mouseEnter : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseEnter finder =
-    step ("mouseEnter " ++ Page.finderFriendlyName finder)
+    step ("mouseEnter " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseEnter finder)
 
 
 mouseLeave : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseLeave finder =
-    step ("mouseLeave " ++ Page.finderFriendlyName finder)
+    step ("mouseLeave " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseLeave finder)
 
 
 mouseOver : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseOver finder =
-    step ("mouseOver " ++ Page.finderFriendlyName finder)
+    step ("mouseOver " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseOver finder)
 
 
 mouseOut : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 mouseOut finder =
-    step ("mouseOut " ++ Page.finderFriendlyName finder)
+    step ("mouseOut " ++ finderFriendlyName finder)
         (simulateEventStep Event.mouseOut finder)
 
 
 check : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 check finder =
-    step ("check " ++ Page.finderFriendlyName finder)
+    step ("check " ++ finderFriendlyName finder)
         (simulateEventStep (Event.check True) finder)
 
 
 uncheck : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 uncheck finder =
-    step ("uncheck " ++ Page.finderFriendlyName finder)
+    step ("uncheck " ++ finderFriendlyName finder)
         (simulateEventStep (Event.check False) finder)
 
 
 submit : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 submit finder =
-    step ("submit " ++ Page.finderFriendlyName finder)
+    step ("submit " ++ finderFriendlyName finder)
         (simulateEventStep Event.submit finder)
 
 
 blur : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 blur finder =
-    step ("blur " ++ Page.finderFriendlyName finder)
+    step ("blur " ++ finderFriendlyName finder)
         (simulateEventStep Event.blur finder)
 
 
 focus : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
 focus finder =
-    step ("focus " ++ Page.finderFriendlyName finder)
+    step ("focus " ++ finderFriendlyName finder)
         (simulateEventStep Event.focus finder)
