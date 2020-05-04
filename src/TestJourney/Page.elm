@@ -54,8 +54,8 @@ finderFriendlyName f =
                     FinderPartSingle name _ ->
                         name
 
-                    FinderPartMultiple name _ _ ->
-                        name
+                    FinderPartMultiple name _ index ->
+                        name ++ "[" ++ String.fromInt index ++ "]"
             )
         |> String.join "."
 
@@ -78,7 +78,7 @@ multiple parent friendlyName selector index =
 
 multipleRecord : Finder -> FriendlyName -> List Selector.Selector -> (Finder -> element) -> Int -> element
 multipleRecord parent friendlyName selector fn index =
-    multiple parent (friendlyName ++ "[" ++ String.fromInt index ++ "]") selector index
+    multiple parent friendlyName selector index
         |> fn
 
 

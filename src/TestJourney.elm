@@ -7,6 +7,7 @@ module TestJourney exposing
     , input
     , mapModel
     , see
+    , seeCount
     , seeText
     , start
     )
@@ -45,6 +46,16 @@ expectationToResult onPass expectation =
             Err f
 
 
+resultToExpectation : Result Failure a -> Expect.Expectation
+resultToExpectation result =
+    case result of
+        Ok _ ->
+            Expect.pass
+
+        Err failure ->
+            failureToExpectation failure
+
+
 prependExpectationDescription : String -> Expect.Expectation -> Expect.Expectation
 prependExpectationDescription description expectation =
     case expectationToFailure expectation of
@@ -63,6 +74,70 @@ expectationToFailure =
 failureToExpectation : Failure -> Expect.Expectation
 failureToExpectation f =
     Expect.fail (Test.Runner.Failure.format f.description f.reason)
+
+
+seeCount : Int -> (Int -> { a | self : Page.Finder }) -> ProgramState model effect msg -> ProgramState model effect msg
+seeCount expectedCount finderFn model =
+    let
+        finder =
+            finderFn 0
+                |> .self
+    in
+    case List.reverse finder of
+        [] ->
+            { model | result = Err (failureFromDescription "Invalid finder for seeCount") }
+
+        lastPart :: rest ->
+            let
+                parentFinder =
+                    List.reverse rest
+            in
+            case lastPart of
+                Page.FinderPartMultiple name (Page.SelectorMultiple selector) _ ->
+                    staticStep
+                        ("seeCount "
+                            ++ String.fromInt expectedCount
+                            ++ " of "
+                            ++ Page.finderFriendlyName
+                                (parentFinder
+                                    ++ [ Page.FinderPartSingle name (Page.SelectorSingle selector) ]
+                                )
+                        )
+                        (seeCountStep expectedCount parentFinder (Page.SelectorMultiple selector))
+                        model
+
+                _ ->
+                    { model | result = Err (failureFromDescription "Invalid single finder for seeCount") }
+
+
+seeCountStep : Int -> Page.Finder -> Page.SelectorMultiple -> ProgramState model effect msg -> Expect.Expectation
+seeCountStep expectedCount parentFinder (Page.SelectorMultiple lastFinderPart) program =
+    program.model
+        |> program.definition.view
+        |> .body
+        |> Html.node "body" []
+        |> Query.fromHtml
+        |> resolveFinder parentFinder
+        |> Result.andThen
+            (\parent ->
+                parent
+                    |> Query.findAll lastFinderPart
+                    |> Query.count
+                        (\c ->
+                            if c == expectedCount then
+                                Expect.pass
+
+                            else
+                                Expect.fail
+                                    ("Expected "
+                                        ++ String.fromInt expectedCount
+                                        ++ " matches found "
+                                        ++ String.fromInt c
+                                    )
+                        )
+                    |> expectationToResult ()
+            )
+        |> resultToExpectation
 
 
 see : Page.Finder -> ProgramState model effect msg -> ProgramState model effect msg
@@ -136,14 +211,7 @@ seeStep finder program =
         |> Html.node "body" []
         |> Query.fromHtml
         |> resolveFinder finder
-        |> (\found ->
-                case found of
-                    Ok _ ->
-                        Expect.pass
-
-                    Err e ->
-                        failureToExpectation e
-           )
+        |> resultToExpectation
 
 
 dontSeeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
