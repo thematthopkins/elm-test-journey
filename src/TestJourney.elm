@@ -7,6 +7,7 @@ module TestJourney exposing
     , custom
     , dontSee
     , doubleClick
+    , expectModel
     , finish
     , focus
     , handleEffect
@@ -423,7 +424,12 @@ start programDefinition =
 
 mapModel : (model -> model) -> ProgramState model effect msg -> ProgramState model effect msg
 mapModel fn program =
-    { program | model = fn program.model }
+    step "mapModel" (\p -> Ok ( fn p.model, [] )) program
+
+
+expectModel : (model -> Expect.Expectation) -> ProgramState model effect msg -> ProgramState model effect msg
+expectModel fn program =
+    staticStep "expectModel" (\p -> fn p.model) program
 
 
 failureWithStepsDescription :
