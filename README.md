@@ -13,7 +13,7 @@ while retaining most of the benefits of unit tests:
 
 # Example #
 
-See [TodoExample.Effect](examples/tests/TodoExampleTest.elm)
+See [TodoExampleTest](examples/tests/TodoExampleTest.elm)
 
 
 # Effects #
