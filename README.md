@@ -1,4 +1,4 @@
-![Build Status](https://github.com/thematthopkins/elm-test-journey/workflows/Elm%20Actions/badge.svg)
+![Build](https://github.com/thematthopkins/elm-test-journey/workflows/Elm%20Actions/badge.svg)
 
 # Elm Test Journey #
 
