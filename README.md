@@ -1,3 +1,5 @@
+![Build Status](https://github.com/thematthopkins/elm-test-journey/workflows/Elm%20Actions/badge.svg)
+
 # Elm Test Journey #
 
 `elm-test-journey` aims to achieve most of the benefits associated w/ acceptance tests:
@@ -10,6 +12,9 @@ while retaining most of the benefits of unit tests:
 2. Type-checked
 3. Easy to debug
 4. Single threaded
+
+# How to install #
+```elm-test install thematthopkins/elm-test-journey```
 
 # Example #
 
