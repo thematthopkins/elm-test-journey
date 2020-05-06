@@ -13,7 +13,7 @@ while retaining most of the benefits of unit tests:
 3. Easy to debug
 4. Single threaded
 
-# How to install #
+## How to install ##
 ```elm-test install thematthopkins/elm-test-journey```
 
 # Example #
@@ -21,7 +21,7 @@ while retaining most of the benefits of unit tests:
 See [TodoExampleTest](examples/tests/TodoExampleTest.elm)
 
 
-# Effects #
+## Effects ##
 
 Instead of mocking out low level Cmd's, the application under test defines an `Effect` type to represent all the side-effects your application can have.
 
@@ -30,13 +30,13 @@ This makes test writing much less error prone and easier to maintain by writing 
 See [TodoExample.Effect](examples/src/TodoExample.elm)
 
 
-# Page Object #
+## Page Object ##
 
 The page object pattern separates the test's knowledge of the HTML's structure from it's tests around the flow of the application.  `elm-test-journey` enables you to easily define one for your application, which provides your tests more compile-time checks and better error messages, while reusing selectors.
 
 
 See [TodoExamplePage](examples/tests/TodoExamplePage.elm)
 
-# Testing Incoming Ports / Subscriptions / Url Changes / etc. #
+## Testing Incoming Ports / Subscriptions / Url Changes / etc. ##
 
 `elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port`/`Subscription`/etc `-> Msg` conversion via traditional unit testing.
