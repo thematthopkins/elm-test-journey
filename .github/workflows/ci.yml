@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: install elm
-          run: |
+        run: |
             npm install -g elm elm-analyse elm-test
 
       - uses: actions/cache@v1
@@ -39,14 +39,14 @@ jobs:
           key: ${{ runner.os }}-elm--home-${{ hashFiles('**/elm.json') }}
 
       - name: elm make
-          run: |
+        run: |
             elm make --output /dev/null && cd examples && elm make src/*.elm --output /dev/null && cd ..
 
       - name: elm test
-          run: |
+        run: |
             cd examples && elm-test && cd ..
 
       - name: elm-analyse
-          run: |
+        run: |
             elm-analyse && cd examples && elm-analyse && cd ..
 
