@@ -11,6 +11,7 @@ module TestJourney exposing
     , finish
     , focus
     , handleEffect
+    , injectMsg
     , input
     , mapModel
     , mouseDown
@@ -422,14 +423,19 @@ start programDefinition =
     }
 
 
+injectMsg : msg -> ProgramState model effect msg -> ProgramState model effect msg
+injectMsg msg =
+    step "injectMsg" (\p -> Ok (p.definition.update msg p.model))
+
+
 mapModel : (model -> model) -> ProgramState model effect msg -> ProgramState model effect msg
-mapModel fn program =
-    step "mapModel" (\p -> Ok ( fn p.model, [] )) program
+mapModel fn =
+    step "mapModel" (\p -> Ok ( fn p.model, [] ))
 
 
 expectModel : (model -> Expect.Expectation) -> ProgramState model effect msg -> ProgramState model effect msg
-expectModel fn program =
-    staticStep "expectModel" (\p -> fn p.model) program
+expectModel fn =
+    staticStep "expectModel" (\p -> fn p.model)
 
 
 failureWithStepsDescription :
