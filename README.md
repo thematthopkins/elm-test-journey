@@ -20,7 +20,7 @@ See [TodoExampleTest](examples/tests/TodoExampleTest.elm)
 
 Instead of mocking out low level Cmd's, the application under test defines an `Effect` type to represent all the side-effects your application can have.
 
-This makes test writing much less error prone and easier to maintain by writing our tests in terms of type-checkable `Effects`, instead of expected Http requests made up of evil strings.
+This makes test writing much less error prone and easier to maintain by writing our tests in terms of type-checkable `Effects`, instead of expected Http requests or Ports made up of evil json and strings.
 
 See [TodoExample.Effect](examples/src/TodoExample.elm)
 
@@ -32,3 +32,6 @@ The page object pattern separates the test's knowledge of the HTML's structure f
 
 See [TodoExamplePage](examples/tests/TodoExamplePage.elm)
 
+# Testing Incoming Ports / Subscriptions / Url Changes / etc. #
+
+`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port`/`Subscription`/etc `-> Msg` conversion via traditional unit testing.
