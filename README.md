@@ -30,5 +30,5 @@ See [TodoExample.Effect](examples/src/TodoExample.elm)
 The page object pattern separates the test's knowledge of the HTML's structure from it's tests around the flow of the application.  `elm-test-journey` enables you to easily define one for your application, which provides your tests more compile-time checks and better error messages, while reusing selectors.
 
 
-See [TodoExamplePage](examples/test/TodoExamplePage.elm)
+See [TodoExamplePage](examples/tests/TodoExamplePage.elm)
 
