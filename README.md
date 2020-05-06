@@ -16,7 +16,7 @@ while retaining most of the benefits of unit tests:
 ## How to install ##
 ```elm-test install thematthopkins/elm-test-journey```
 
-# Example #
+## Example ##
 
 See [TodoExampleTest](examples/tests/TodoExampleTest.elm)
 
