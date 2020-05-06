@@ -43,7 +43,7 @@ jobs:
             elm make --output /dev/null && cd examples && elm make src/*.elm --output /dev/null && cd ..
 
       - name: elm test
-	        run: |
+          run: |
             cd examples && elm-test && cd ..
 
       - name: elm-analyse
