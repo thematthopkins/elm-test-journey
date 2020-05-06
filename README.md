@@ -1,19 +1,19 @@
 # Elm Test Journey #
 
-Elm Test Journey aims to achieve most of the benefits associated w/ acceptance tests:
+`elm-test-journey` aims to achieve most of the benefits associated w/ acceptance tests:
 1. Written from the user's perspective
 2. Independence from implementation
 3. Ensure proper interaction between components
 
 while retaining most of the benefits of unit tests:
 1. Fast
-2. Type-checking
-3. Easy debugging
+2. Type-checked
+3. Easy to debug
 4. Single threaded
 
 # Example #
 
-See [TodoExample.Effect](examples/test/TodoExampleTest.elm)
+See [TodoExample.Effect](examples/tests/TodoExampleTest.elm)
 
 
 # Effects #
