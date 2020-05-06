@@ -15,33 +15,38 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
       - name: Use Node.js
         uses: actions/setup-node@v1
         with:
           node-version: 14
+
       - uses: actions/cache@v1
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
       - name: install elm
           run: |
-	          npm install -g elm elm-analyse elm-test
+            npm install -g elm elm-analyse elm-test
+
       - uses: actions/cache@v1
         id: elm-cache
         with:
           path: ~/.elm
           key: ${{ runner.os }}-elm--home-${{ hashFiles('**/elm.json') }}
+
       - name: elm make
-	      run: |
-          elm make --output /dev/null && cd examples && elm make src/*.elm --output /dev/null && cd ..
+          run: |
+            elm make --output /dev/null && cd examples && elm make src/*.elm --output /dev/null && cd ..
 
       - name: elm test
-	      run: |
-          cd examples && elm-test && cd ..
+	        run: |
+            cd examples && elm-test && cd ..
 
       - name: elm-analyse
-        run: |
-          elm-analyse && cd examples && elm-analyse && cd ..
+          run: |
+            elm-analyse && cd examples && elm-analyse && cd ..
 
