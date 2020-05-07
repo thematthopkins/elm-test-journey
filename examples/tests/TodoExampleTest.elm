@@ -23,6 +23,7 @@ suite =
         [ test "Add Item" <|
             \_ ->
                 J.start program
+                    |> J.see page
                     |> J.input "myNewItem" page.addItemTextInput
                     |> J.dontSee page.addItemLoader
                     |> J.click page.addItemButton

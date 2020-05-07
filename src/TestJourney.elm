@@ -196,7 +196,7 @@ seeCountStep expectedCount parentFinder lastFinderPart program =
         |> resultToExpectation
 
 
-{-| Expect a given element to exist.
+{-| Expect a given element to exist exactly once.
 -}
 see : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
@@ -219,8 +219,8 @@ seeText expectText element =
         )
 
 
-{-| Expect a given element to not exist. If the target is a sequence of selectors (e.g. `parent.child.grandchild`), `dontSee` only passes if
-`parent`, and `child` exist, but `grandchild` does not.
+{-| Expect a given element to not exist. If the target is a sequence of page finders (e.g. `parent.child.grandchild`), `dontSee` only passes if
+`parent`, and `child` exist, but `grandchild` does not. Otherwise, it's too easy for `dontSee` to inadvertantly pass.
 -}
 dontSee : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
@@ -235,11 +235,29 @@ resolveFinder (Finder finder) query =
                 |> Result.andThen
                     (\parent ->
                         case finderPart of
-                            FinderPartSingle _ selector ->
+                            FinderPartSingle friendlyName selector ->
                                 let
                                     failure =
                                         parent
-                                            |> Query.has selector
+                                            |> Expect.all
+                                                [ Query.has selector
+                                                , \p ->
+                                                    p
+                                                        |> Query.findAll selector
+                                                        |> Query.count
+                                                            (\count ->
+                                                                if count == 1 then
+                                                                    Expect.pass
+
+                                                                else
+                                                                    Expect.fail
+                                                                        ("Expected to find just 1 "
+                                                                            ++ friendlyName
+                                                                            ++ " but found "
+                                                                            ++ String.fromInt count
+                                                                        )
+                                                            )
+                                                ]
                                             |> expectationToFailure
                                 in
                                 case failure of

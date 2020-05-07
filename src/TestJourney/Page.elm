@@ -1,16 +1,32 @@
 module TestJourney.Page exposing
-    ( Element
-    , Finder
-    , multiple
-    , multipleRecord
-    , multipleRecordTestAttr
-    , multipleTestAttr
-    , root
-    , single
-    , singleRecord
-    , singleRecordTestAttr
-    , singleTestAttr
+    ( root, multiple, multipleRecord, single, singleRecord
+    , Element, Finder
+    , multipleTestAttr, multipleRecordTestAttr, singleTestAttr, singleRecordTestAttr
     )
+
+{-| Create Page Objects for `elm-test-journey`.
+
+
+## Building the Page Model
+
+@docs root, multiple, multipleRecord, single, singleRecord
+
+
+## Types
+
+@docs Element, Finder
+
+
+## Helpers
+
+In practice, a convention like "all elements are identified by an `"data-test"="myTestIdentifier"`" makes page objects
+more resiliant, and makes it clear when a node in the application under test has test dependencies. These helpers make
+creating Page Objects targeting that convention simpler. If your project has it's own conventions, create your own set of
+helpers.
+
+@docs multipleTestAttr, multipleRecordTestAttr, singleTestAttr, singleRecordTestAttr
+
+-}
 
 import Html.Attributes as Attributes
 import Test.Html.Selector as Selector
@@ -25,9 +41,11 @@ type alias Element children =
     { children | self : Finder }
 
 
-root : Finder
-root =
-    Internal.Finder []
+{-| Sets up the context for the rest of the page object. An empty selector will match the root of the view (usually the body tag).
+-}
+root : List Selector.Selector -> (Finder -> Element children) -> Element children
+root selector fn =
+    fn (Internal.Finder [ FinderPartSingle "" selector ])
 
 
 single : Finder -> FriendlyName -> List Selector.Selector -> Element {}
