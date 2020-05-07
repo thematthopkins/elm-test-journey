@@ -13,7 +13,6 @@ program =
     { view = TodoExample.view
     , update = TodoExample.update
     , initialModel = TodoExample.emptyModel
-    , subscriptions = TodoExample.subscriptions
     , debugToString = Debug.toString
     }
 

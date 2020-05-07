@@ -1,32 +1,47 @@
 module TestJourney exposing
-    ( EffectHandlerResult(..)
-    , ProgramDefinition
-    , blur
-    , check
-    , click
-    , custom
-    , dontSee
-    , doubleClick
-    , expectModel
-    , finish
-    , focus
-    , handleEffect
+    ( start, ProgramDefinition, finish
+    , mapModel, expectModel
+    , handleEffect, EffectHandlerResult(..)
     , injectMsg
-    , input
-    , mapModel
-    , mouseDown
-    , mouseEnter
-    , mouseLeave
-    , mouseOut
-    , mouseOver
-    , mouseUp
-    , see
-    , seeCount
-    , seeText
-    , start
-    , submit
-    , uncheck
+    , blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
+    , see, dontSee, seeCount, seeText
     )
+
+{-| Write easy-to-maintain acceptance-like tests.
+
+
+## Setup
+
+@docs start, ProgramDefinition, finish
+
+
+## Direct model access
+
+@docs mapModel, expectModel
+
+
+## Effects
+
+@docs handleEffect, EffectHandlerResult
+
+
+## Messages
+
+@docs injectMsg
+
+
+## Html Events
+
+@docs blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
+
+
+## Expectations
+
+To be used with your [`page`](../Page#page)
+
+@docs see, dontSee, seeCount, seeText, dontSee
+
+-}
 
 import Browser
 import Expect
@@ -113,6 +128,8 @@ failureToExpectation f =
     Expect.fail (Test.Runner.Failure.format f.description f.reason)
 
 
+{-| Expect a given number of matching elements to exist.
+-}
 seeCount : Int -> (Int -> Page.Element children) -> ProgramState model effect msg -> ProgramState model effect msg
 seeCount expectedCount finderFn model =
     let
@@ -179,11 +196,15 @@ seeCountStep expectedCount parentFinder lastFinderPart program =
         |> resultToExpectation
 
 
+{-| Expect a given element to exist.
+-}
 see : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 see finder =
     staticStep ("see " ++ finderFriendlyName finder.self) (seeStep finder.self)
 
 
+{-| Expect a given element to have a descendant w/ the given text.
+-}
 seeText : String -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 seeText expectText element =
     let
@@ -198,6 +219,9 @@ seeText expectText element =
         )
 
 
+{-| Expect a given element to not exist. If the target is a sequence of selectors (e.g. `parent.child.grandchild`), `dontSee` only passes if
+`parent`, and `child` exist, but `grandchild` does not.
+-}
 dontSee : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
 dontSee finder =
     staticStep ("dontSee " ++ finderFriendlyName finder.self) (dontSeeStep finder.self)
@@ -320,6 +344,11 @@ dontSeeChildStep parentFinder childFinder program =
             failureToExpectation failure
 
 
+{-| Processes the next effect waiting to be processed.
+
+This is usually simulating the other end of your effect. In the case of an effect representing an HTTP Cmd, this takes place of the server. For an out port, this plays the role simulating the javascript code.
+
+-}
 handleEffect : (effect -> EffectHandlerResult msg) -> ProgramState model effect msg -> ProgramState model effect msg
 handleEffect fn programState =
     let
@@ -397,15 +426,6 @@ handleEffectStep fn program =
             Err (failureFromDescription "attempted to handle effect when no effects were generated")
 
 
-type alias ProgramDefinition model effect msg =
-    { view : model -> Browser.Document msg
-    , update : msg -> model -> ( model, List effect )
-    , initialModel : model
-    , subscriptions : model -> Sub msg
-    , debugToString : effect -> String
-    }
-
-
 type alias ProgramState model effect msg =
     { model : model
     , definition : ProgramDefinition model effect msg
@@ -414,6 +434,21 @@ type alias ProgramState model effect msg =
     }
 
 
+{-| Defines the application under test. This mirrors your elm `Program`, but without subscriptions or init, and `List effect` instead of `Cmd`.
+
+`debugToString` should always be `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
+
+-}
+type alias ProgramDefinition model effect msg =
+    { view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, List effect )
+    , initialModel : model
+    , debugToString : effect -> String
+    }
+
+
+{-| Call at the start of your test pipeline to kick things off.
+-}
 start : ProgramDefinition model effect msg -> ProgramState model effect msg
 start programDefinition =
     { model = programDefinition.initialModel
@@ -423,16 +458,22 @@ start programDefinition =
     }
 
 
+{-| Sends the supplied `msg` into appliication under test. This is how `ports` and `Subscriptions` should be simulated.
+-}
 injectMsg : msg -> ProgramState model effect msg -> ProgramState model effect msg
 injectMsg msg =
     step "injectMsg" (\p -> Ok (p.definition.update msg p.model))
 
 
+{-| Directly manipulate the current model of the application under tests.
+-}
 mapModel : (model -> model) -> ProgramState model effect msg -> ProgramState model effect msg
 mapModel fn =
     step "mapModel" (\p -> Ok ( fn p.model, [] ))
 
 
+{-| Directly run an expectation on the current model of the application under tests.
+-}
 expectModel : (model -> Expect.Expectation) -> ProgramState model effect msg -> ProgramState model effect msg
 expectModel fn =
     staticStep "expectModel" (\p -> fn p.model)
