@@ -18,7 +18,7 @@ while retaining most of the benefits of unit tests:
 
 ## Example ##
 
-See [TodoExampleTest](examples/tests/TodoExampleTest.elm)
+See [TodoExampleTest](https://github.com/thematthopkins/elm-test-journey/blob/master/examples/tests/TodoExampleTest.elm)
 
 
 ## Effects ##
@@ -27,7 +27,7 @@ Instead of mocking out low level Cmd's, the application under test defines an `E
 
 This makes test writing much less error prone and easier to maintain by writing our tests in terms of type-checkable `Effects`, instead of expected Http requests or Ports made up of evil json and strings.
 
-See [TodoExample.Effect](examples/src/TodoExample.elm)
+See [TodoExample.Effect](https://github.com/thematthopkins/elm-test-journey/blob/master/examples/src/TodoExample.elm)
 
 
 ## Page Object ##
@@ -35,7 +35,7 @@ See [TodoExample.Effect](examples/src/TodoExample.elm)
 The page object pattern separates the test's knowledge of the HTML's structure from it's tests around the flow of the application.  `elm-test-journey` enables you to easily define one for your application, which provides your tests more compile-time checks and better error messages, while reusing selectors.
 
 
-See [TodoExamplePage](examples/tests/TodoExamplePage.elm)
+See [TodoExamplePage](https://github.com/thematthopkins/elm-test-journey/blob/master/examples/tests/TodoExamplePage.elm)
 
 ## Testing Incoming Ports / Subscriptions / Url Changes / etc. ##
 
