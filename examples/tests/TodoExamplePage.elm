@@ -1,9 +1,27 @@
-module TodoExamplePage exposing (page)
+module TodoExamplePage exposing (Page, page)
 
 import Html.Attributes exposing (..)
 import TestJourney.Page as P
 
 
+type alias Page =
+    P.Element
+        { addItemButton : P.Element {}
+        , addItemLoader : P.Element {}
+        , addItemTextInput : P.Element {}
+        , items :
+            Int
+            ->
+                P.Element
+                    { complete : P.Element {}
+                    , label : P.Element {}
+                    , removeButton : P.Element {}
+                    , removeProcessing : P.Element {}
+                    }
+        }
+
+
+page : Page
 page =
     P.root []
         (\root ->

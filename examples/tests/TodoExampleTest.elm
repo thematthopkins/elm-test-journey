@@ -8,12 +8,12 @@ import TodoExample
 import TodoExamplePage exposing (page)
 
 
-program : J.ProgramDefinition TodoExample.Model (TodoExample.Effect TodoExample.Msg) TodoExample.Msg
+program : J.DocumentProgram TodoExample.Model TodoExample.Msg (TodoExample.Effect TodoExample.Msg)
 program =
     { view = TodoExample.view
     , update = TodoExample.update
-    , initialModel = TodoExample.emptyModel
-    , debugToString = Debug.toString
+    , model = TodoExample.emptyModel
+    , effectToString = Debug.toString
     }
 
 
@@ -22,7 +22,7 @@ suite =
     describe "TODO List"
         [ test "Add Item" <|
             \_ ->
-                J.start program
+                J.startDocument program
                     |> J.see page
                     |> J.input "myNewItem" page.addItemTextInput
                     |> J.dontSee page.addItemLoader
@@ -52,7 +52,7 @@ suite =
                     |> J.finish
         , test "Remove Item" <|
             \_ ->
-                J.start program
+                J.startDocument program
                     |> J.mapModel
                         (\m ->
                             { m

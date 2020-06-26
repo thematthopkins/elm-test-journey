@@ -13,6 +13,7 @@ while retaining most of the benefits of unit tests:
 3. Easy to debug
 4. Single threaded
 
+
 ## How to install ##
 ```elm-test install thematthopkins/elm-test-journey```
 
@@ -23,7 +24,7 @@ See [TodoExampleTest](https://github.com/thematthopkins/elm-test-journey/blob/ma
 
 ## Effects ##
 
-Instead of mocking out low level Cmd's, the application under test defines an `Effect` type to represent all the side-effects your application can have.
+Instead of mocking out low level `Cmd`'s, the application under test defines an `Effect` type to represent all the side-effects your application can have.
 
 This makes test writing much less error prone and easier to maintain by writing our tests in terms of type-checkable `Effects`, instead of expected Http requests or Ports made up of evil json and strings.
 
@@ -39,4 +40,6 @@ See [TodoExamplePage](https://github.com/thematthopkins/elm-test-journey/blob/ma
 
 ## Testing Incoming Ports / Subscriptions / Url Changes / etc. ##
 
-`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port`/`Subscription`/etc `-> Msg` conversion via traditional unit testing.
+`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created from the port/subscription/etc.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port/subscription/etc -> Msg` conversion via traditional unit testing.
+
+This is where `elm-test-journey`'s approach differs from [elm-test-program](https://github.com/avh4/elm-program-test).  If you'd like to incorporate tests for these lower-level events more directly into your acceptance tests, [elm-test-program](https://github.com/avh4/elm-program-test) may be a better option.

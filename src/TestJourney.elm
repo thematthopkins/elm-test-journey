@@ -1,5 +1,10 @@
 module TestJourney exposing
-    ( start, ProgramDefinition, finish
+    ( startSandbox, SandboxProgram
+    , startApplication, ApplicationProgram
+    , startElement, ElementProgram
+    , startDocument, DocumentProgram
+    , startView
+    , finish
     , mapModel, expectModel
     , handleEffect, EffectHandlerResult(..)
     , injectMsg
@@ -12,7 +17,13 @@ module TestJourney exposing
 
 ## Setup
 
-@docs start, ProgramDefinition, finish
+@docs startSandbox, SandboxProgram
+@docs startApplication, ApplicationProgram
+@docs startElement, ElementProgram
+@docs startDocument, DocumentProgram
+@docs startView
+
+@docs finish
 
 
 ## Direct model access
@@ -54,38 +65,141 @@ import Test.Runner
 import Test.Runner.Failure
 import TestJourney.Internal exposing (Finder(..), FinderPart(..))
 import TestJourney.Page as Page
+import Url
 
 
-{-| Defines the application under test. This mirrors your elm `Program`, but without subscriptions or init, and `List effect` instead of `Cmd`.
+{-| For use in [`startDocument`](#startDocument).
 
-`debugToString` should always be `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
+`effectToString` should always be set to `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
 
 -}
-type alias ProgramDefinition model effect msg =
+type alias DocumentProgram model msg effect =
     { view : model -> Browser.Document msg
     , update : msg -> model -> ( model, List effect )
-    , initialModel : model
-    , debugToString : effect -> String
+    , model : model
+    , effectToString : effect -> String
     }
 
 
-{-| Call at the start of your test pipeline to kick things off.
+{-| Defines the application under test and starts the test pipeline. Simular to `Browser.document`, but without subscriptions or init, and `List effect` instead of `Cmd`.
 -}
-start : ProgramDefinition model effect msg -> ProgramState model effect msg
-start programDefinition =
-    { model = programDefinition.initialModel
-    , definition = programDefinition
+startDocument : DocumentProgram model msg effect -> TestState model msg effect
+startDocument program =
+    start (ProgramDefinitionDocument program)
+
+
+{-| For use in [`startElement`](#startElement).
+
+`effectToString` should always be set to `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
+
+-}
+type alias ElementProgram model msg effect =
+    { view : model -> Html.Html msg
+    , update : msg -> model -> ( model, List effect )
+    , model : model
+    , effectToString : effect -> String
+    }
+
+
+{-| Defines the application under test and starts the test pipeline. Simular to `Browser.element`, but without subscriptions or init, and `List effect` instead of `Cmd`.
+
+This is also useful if you want to want to limite the system under test to a subsection of your application, like a single page of an application, or maybe a single widget within your application.
+
+-}
+startElement : ElementProgram model msg effect -> TestState model msg effect
+startElement program =
+    start (ProgramDefinitionElement program)
+
+
+{-| Defines the application under test as a static Html.Html. Useful if you want to test a view function in isolation.
+-}
+startView : Html.Html msg -> TestState model msg effect
+startView html =
+    start (ProgramDefinitionHtml html)
+
+
+{-| For use in [`startApplication`](#startApplication).
+
+`effectToString` should always be set to `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
+
+-}
+type alias ApplicationProgram model msg effect =
+    { view : model -> Browser.Document msg
+    , update : msg -> model -> ( model, List effect )
+    , model : model
+    , onUrlRequest : Browser.UrlRequest -> msg
+    , onUrlChange : Url.Url -> msg
+    , effectToString : effect -> String
+    }
+
+
+{-| Defines the application under test and starts the test pipeline. Simular to `Browser.application`, but without subscriptions or init, and `List effect` instead of `Cmd`.
+-}
+startApplication : ApplicationProgram model msg effect -> TestState model msg effect
+startApplication program =
+    start (ProgramDefinitionApplication program)
+
+
+{-| For use in [`startSandbox`](#startSandbox).
+
+`effectToString` should always be set to `Debug.toString`. Having the caller supply this allows `elm-test-program` to avoid it's use, and be published as a package.
+
+-}
+type alias SandboxProgram model msg =
+    { view : model -> Html.Html msg
+    , update : msg -> model -> model
+    , model : model
+    }
+
+
+{-| Defines the application under test and starts the test pipeline. Simular to `Browser.sandbox`.
+-}
+startSandbox : SandboxProgram model msg -> TestState model msg effect
+startSandbox program =
+    start (ProgramDefinitionSandbox program)
+
+
+type ProgramDefinition model msg effect
+    = ProgramDefinitionApplication (ApplicationProgram model msg effect)
+    | ProgramDefinitionSandbox (SandboxProgram model msg)
+    | ProgramDefinitionElement (ElementProgram model msg effect)
+    | ProgramDefinitionDocument (DocumentProgram model msg effect)
+    | ProgramDefinitionHtml (Html.Html msg)
+
+
+start : ProgramDefinition model msg effect -> TestState model msg effect
+start program =
+    { program = program
     , pendingEffects = []
     , result = Ok []
     }
 
 
+programEffectToString : ProgramDefinition model msg effect -> Maybe (effect -> String)
+programEffectToString program =
+    case program of
+        ProgramDefinitionApplication p ->
+            Just p.effectToString
+
+        ProgramDefinitionSandbox _ ->
+            Nothing
+
+        ProgramDefinitionElement p ->
+            Just p.effectToString
+
+        ProgramDefinitionDocument p ->
+            Just p.effectToString
+
+        ProgramDefinitionHtml _ ->
+            Nothing
+
+
 {-| Call at the end of your test. Automatically add an expectations that there are no
 pending effects left to process, since that is usually inadvertant in practice.
 -}
-finish : ProgramState model effect msg -> Expect.Expectation
-finish program =
-    case program.result of
+finish : TestState model msg effect -> Expect.Expectation
+finish testState =
+    case testState.result of
         Err e ->
             failureToExpectation e
 
@@ -93,42 +207,91 @@ finish program =
             if stepsProcessed == [] then
                 Expect.fail "Empty test failed - no steps or expectations provided"
 
-            else if program.pendingEffects /= [] then
-                Expect.fail
-                    ("Test finished with "
-                        ++ String.fromInt (List.length program.pendingEffects)
-                        ++ " pending expectations that were left unhandled:\n"
-                        ++ (program.pendingEffects
-                                |> List.map program.definition.debugToString
-                                |> List.map (\s -> "    " ++ s)
-                                |> String.join "\n"
-                           )
-                        ++ "\nCompleted steps:\n"
-                        ++ (stepsProcessed
-                                |> List.map
-                                    (\s ->
-                                        "    [Passed] " ++ s
-                                    )
-                                |> String.join "\n"
-                           )
-                    )
+            else if testState.pendingEffects /= [] then
+                case programEffectToString testState.program of
+                    Nothing ->
+                        Expect.fail "Failed with pending effects and no way to print them"
+
+                    Just effectToString ->
+                        failureWithStepsDescription
+                            stepsProcessed
+                            ("test finished with "
+                                ++ String.fromInt (List.length testState.pendingEffects)
+                                ++ " pending expectations that were left unhandled"
+                            )
+                            (failureFromDescription
+                                (testState.pendingEffects
+                                    |> List.map effectToString
+                                    |> List.map (\s -> "    " ++ s)
+                                    |> String.join "\n"
+                                )
+                            )
+                            |> failureToExpectation
 
             else
                 Expect.pass
 
 
-{-| Directly transform the underlying model. This can be useful for altering your [`initialModel`](#ProgramDefinition) supplied in [`ProgramDefinition`](#ProgramDefinition). This should generally be avoided, in the body of your tests.
+{-| Directly transform the underlying model. This can be useful for altering your [`model`](#ProgramDefinition) supplied in [`ProgramDefinition`](#ProgramDefinition). This should generally be avoided in the body of your tests.
 -}
-mapModel : (model -> model) -> ProgramState model effect msg -> ProgramState model effect msg
+mapModel : (model -> model) -> TestState model msg effect -> TestState model msg effect
 mapModel fn =
-    step "mapModel" (\p -> Ok ( fn p.model, [] ))
+    step "mapModel"
+        (\program effects ->
+            let
+                op =
+                    \constructor programWithModel ->
+                        let
+                            newModel =
+                                fn programWithModel.model
+                        in
+                        Ok ( constructor { programWithModel | model = newModel }, effects )
+            in
+            case program of
+                ProgramDefinitionApplication p ->
+                    op ProgramDefinitionApplication p
+
+                ProgramDefinitionSandbox p ->
+                    op ProgramDefinitionSandbox p
+
+                ProgramDefinitionElement p ->
+                    op ProgramDefinitionElement p
+
+                ProgramDefinitionDocument p ->
+                    op ProgramDefinitionDocument p
+
+                ProgramDefinitionHtml _ ->
+                    Err (failureFromDescription "Operation not permitted for startView.  Try startSandbox to include a model.")
+        )
 
 
 {-| Directly run an expectation on the current model of the application under tests. Useful when there are changes that aren't represented in the UI (e.g. I want to make sure I get a new session id after logging in).
 -}
-expectModel : (model -> Expect.Expectation) -> ProgramState model effect msg -> ProgramState model effect msg
+expectModel : (model -> Expect.Expectation) -> TestState model msg effect -> TestState model msg effect
 expectModel fn =
-    staticStep "expectModel" (\p -> fn p.model)
+    stepExpectProgram "expectModel"
+        (\program ->
+            let
+                op =
+                    \programWithModel ->
+                        fn programWithModel.model
+            in
+            case program of
+                ProgramDefinitionApplication p ->
+                    op p
+
+                ProgramDefinitionSandbox p ->
+                    op p
+
+                ProgramDefinitionElement p ->
+                    op p
+
+                ProgramDefinitionDocument p ->
+                    op p
+
+                ProgramDefinitionHtml _ ->
+                    Expect.fail "Operation not permitted for startView.  Try startSandbox to include a model."
+        )
 
 
 {-| Processes the next effect waiting to be processed.
@@ -163,16 +326,37 @@ This is usually simulating the other end of your effect. In the case of an effec
                     EffectUnexpected
 
 -}
-handleEffect : (effect -> EffectHandlerResult msg) -> ProgramState model effect msg -> ProgramState model effect msg
-handleEffect fn programState =
-    let
-        nextEffect =
-            programState.pendingEffects
-                |> List.head
-                |> Maybe.map (\e -> "(" ++ programState.definition.debugToString e ++ ")")
-                |> Maybe.withDefault ""
-    in
-    step ("handleEffect " ++ nextEffect) (handleEffectStep fn) programState
+handleEffect : (effect -> EffectHandlerResult msg) -> TestState model msg effect -> TestState model msg effect
+handleEffect fn testState =
+    case testState.pendingEffects of
+        [] ->
+            stepFail "handleEffect" "attempted to handle effect when no effects were generated or no pending effects remain" testState
+
+        nextEffect :: remainingEffects ->
+            case programEffectToString testState.program of
+                Nothing ->
+                    stepFail "handleEffect" "Operation not permitted for startSandbox.  Try startElement for programs with effects." testState
+
+                Just effectToString ->
+                    step ("handleEffect " ++ effectToString nextEffect)
+                        (\prog _ ->
+                            case fn nextEffect of
+                                EffectProcessed expect msg ->
+                                    let
+                                        failure =
+                                            expectationToFailure expect
+                                    in
+                                    case failure of
+                                        Just f ->
+                                            Err f
+
+                                        Nothing ->
+                                            update msg prog remainingEffects
+
+                                EffectUnexpected ->
+                                    Err (failureFromDescription ("Unhandled effect: " ++ effectToString nextEffect))
+                        )
+                        testState
 
 
 {-| The results returned by [`handleEffect`](#handleEffect). Returns either an `EffectProcessed` w/ an `Expectation` and the msg to be sent to the `update` function of the application under test.
@@ -182,47 +366,58 @@ type EffectHandlerResult msg
     | EffectUnexpected
 
 
-handleEffectStep : (effect -> EffectHandlerResult msg) -> Step model effect msg
-handleEffectStep fn program =
-    case program.pendingEffects of
-        effect :: _ ->
-            let
-                result =
-                    fn effect
-            in
-            case result of
-                EffectProcessed expect msg ->
-                    let
-                        failure =
-                            expectationToFailure expect
-                    in
-                    case failure of
-                        Just f ->
-                            Err f
-
-                        Nothing ->
-                            Ok (program.definition.update msg program.model)
-
-                EffectUnexpected ->
-                    Err (failureFromDescription ("Unhandled effect: " ++ program.definition.debugToString effect))
-
-        [] ->
-            Err (failureFromDescription "attempted to handle effect when no effects were generated")
-
-
-type alias ProgramState model effect msg =
-    { model : model
-    , definition : ProgramDefinition model effect msg
+type alias TestState model msg effect =
+    { program : ProgramDefinition model msg effect
     , pendingEffects : List effect
     , result : Result Failure (List StepDescription)
     }
 
 
+update :
+    msg
+    -> ProgramDefinition model msg effect
+    -> List effect
+    -> Result Failure ( ProgramDefinition model msg effect, List effect )
+update msg program effects =
+    let
+        effectOp =
+            \constructor programWithUpdate ->
+                let
+                    ( newModel, addedEffects ) =
+                        programWithUpdate.update msg programWithUpdate.model
+                in
+                Ok ( constructor { programWithUpdate | model = newModel }, effects ++ addedEffects )
+
+        noEffectOp =
+            \constructor programWithUpdate ->
+                let
+                    newModel =
+                        programWithUpdate.update msg programWithUpdate.model
+                in
+                Ok ( constructor { programWithUpdate | model = newModel }, effects )
+    in
+    case program of
+        ProgramDefinitionApplication p ->
+            effectOp ProgramDefinitionApplication p
+
+        ProgramDefinitionSandbox p ->
+            noEffectOp ProgramDefinitionSandbox p
+
+        ProgramDefinitionElement p ->
+            effectOp ProgramDefinitionElement p
+
+        ProgramDefinitionDocument p ->
+            effectOp ProgramDefinitionDocument p
+
+        ProgramDefinitionHtml _ ->
+            Err (failureFromDescription "invalid opration on startView.  Try startElement so you have an update function.")
+
+
 {-| Sends the supplied `msg` into appliication under test. This is how `ports` and `Subscriptions` should be simulated.
 -}
-injectMsg : msg -> ProgramState model effect msg -> ProgramState model effect msg
+injectMsg : msg -> TestState model msg effect -> TestState model msg effect
 injectMsg msg =
-    step "injectMsg" (\p -> Ok (p.definition.update msg p.model))
+    step "injectMsg" (update msg)
 
 
 
@@ -231,18 +426,16 @@ injectMsg msg =
 
 {-| Ensures the target element exists exactly once, simulates a click event, and processes the generated message.
 -}
-click : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+click : Page.Element children -> TestState model msg effect -> TestState model msg effect
 click finder =
-    step ("click " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.click finder.self)
+    stepSimulateEvent ("click " ++ finderFriendlyName finder.self) Event.click finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a input event w/ the given text, and processes the generated message.
 -}
-input : String -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+input : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
 input text finder =
-    step ("input \"" ++ text ++ "\" on " ++ finderFriendlyName finder.self)
-        (simulateEventStep (Event.input text) finder.self)
+    stepSimulateEvent ("input \"" ++ text ++ "\" on " ++ finderFriendlyName finder.self) (Event.input text) finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a custom, and processes the generated message.
@@ -250,106 +443,93 @@ input text finder =
                         See (see [Test.Html.Event.custom](https://package.elm-lang.org/packages/elm-explorations/test/latest/Test-Html-Event#custom))
 
 -}
-custom : String -> Json.Encode.Value -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+custom : String -> Json.Encode.Value -> Page.Element children -> TestState model msg effect -> TestState model msg effect
 custom eventName value finder =
-    step ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ finderFriendlyName finder.self)
-        (simulateEventStep (Event.custom eventName value) finder.self)
+    stepSimulateEvent ("custom \"" ++ eventName ++ "\" sent \"" ++ Json.Encode.encode 4 value ++ "\" on " ++ finderFriendlyName finder.self) (Event.custom eventName value) finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a double-click event, and processes the generated message.
 -}
-doubleClick : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+doubleClick : Page.Element children -> TestState model msg effect -> TestState model msg effect
 doubleClick finder =
-    step ("doubleClick " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.doubleClick finder.self)
+    stepSimulateEvent ("doubleClick " ++ finderFriendlyName finder.self) Event.doubleClick finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseDown event, and processes the generated message.
 -}
-mouseDown : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseDown : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseDown finder =
-    step ("mouseDown " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseDown finder.self)
+    stepSimulateEvent ("mouseDown " ++ finderFriendlyName finder.self) Event.mouseDown finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseUp event, and processes the generated message.
 -}
-mouseUp : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseUp : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseUp finder =
-    step ("mouseUp " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseUp finder.self)
+    stepSimulateEvent ("mouseUp " ++ finderFriendlyName finder.self) Event.mouseUp finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseEnter event, and processes the generated message.
 -}
-mouseEnter : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseEnter : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseEnter finder =
-    step ("mouseEnter " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseEnter finder.self)
+    stepSimulateEvent ("mouseEnter " ++ finderFriendlyName finder.self) Event.mouseEnter finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseLeave event, and processes the generated message.
 -}
-mouseLeave : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseLeave : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseLeave finder =
-    step ("mouseLeave " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseLeave finder.self)
+    stepSimulateEvent ("mouseLeave " ++ finderFriendlyName finder.self) Event.mouseLeave finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseOver event, and processes the generated message.
 -}
-mouseOver : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseOver : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseOver finder =
-    step ("mouseOver " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseOver finder.self)
+    stepSimulateEvent ("mouseOver " ++ finderFriendlyName finder.self) Event.mouseOver finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a mouseOut event, and processes the generated message.
 -}
-mouseOut : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+mouseOut : Page.Element children -> TestState model msg effect -> TestState model msg effect
 mouseOut finder =
-    step ("mouseOut " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.mouseOut finder.self)
+    stepSimulateEvent ("mouseOut " ++ finderFriendlyName finder.self) Event.mouseOut finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a check true event, and processes the generated message.
 -}
-check : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+check : Page.Element children -> TestState model msg effect -> TestState model msg effect
 check finder =
-    step ("check " ++ finderFriendlyName finder.self)
-        (simulateEventStep (Event.check True) finder.self)
+    stepSimulateEvent ("check " ++ finderFriendlyName finder.self) (Event.check True) finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates an check false event, and processes the generated message.
 -}
-uncheck : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+uncheck : Page.Element children -> TestState model msg effect -> TestState model msg effect
 uncheck finder =
-    step ("uncheck " ++ finderFriendlyName finder.self)
-        (simulateEventStep (Event.check False) finder.self)
+    stepSimulateEvent ("uncheck " ++ finderFriendlyName finder.self) (Event.check False) finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a submit event, and processes the generated message.
 -}
-submit : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+submit : Page.Element children -> TestState model msg effect -> TestState model msg effect
 submit finder =
-    step ("submit " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.submit finder.self)
+    stepSimulateEvent ("submit " ++ finderFriendlyName finder.self) Event.submit finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a blur event, and processes the generated message.
 -}
-blur : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+blur : Page.Element children -> TestState model msg effect -> TestState model msg effect
 blur finder =
-    step ("blur " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.blur finder.self)
+    stepSimulateEvent ("blur " ++ finderFriendlyName finder.self) Event.blur finder.self
 
 
 {-| Ensures the target element exists exactly once, simulates a focus event, and processes the generated message.
 -}
-focus : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+focus : Page.Element children -> TestState model msg effect -> TestState model msg effect
 focus finder =
-    step ("focus " ++ finderFriendlyName finder.self)
-        (simulateEventStep Event.focus finder.self)
+    stepSimulateEvent ("focus " ++ finderFriendlyName finder.self) Event.focus finder.self
 
 
 
@@ -358,8 +538,8 @@ focus finder =
 
 {-| Expect exactly a given number of matching elements to exist.
 -}
-seeCount : Int -> (Int -> Page.Element children) -> ProgramState model effect msg -> ProgramState model effect msg
-seeCount expectedCount finderFn model =
+seeCount : Int -> (Int -> Page.Element children) -> TestState model msg effect -> TestState model msg effect
+seeCount expectedCount finderFn =
     let
         (Finder finder) =
             finderFn 0
@@ -367,7 +547,7 @@ seeCount expectedCount finderFn model =
     in
     case List.reverse finder of
         [] ->
-            { model | result = Err (failureFromDescription "Invalid finder for seeCount") }
+            stepFail "seeCount" "Invalid finder for seeCount"
 
         lastPart :: rest ->
             let
@@ -376,7 +556,7 @@ seeCount expectedCount finderFn model =
             in
             case lastPart of
                 FinderPartMultiple name selector _ ->
-                    staticStep
+                    stepExpectView
                         ("seeCount "
                             ++ String.fromInt expectedCount
                             ++ " of "
@@ -387,72 +567,65 @@ seeCount expectedCount finderFn model =
                                     )
                                 )
                         )
-                        (seeCountStep expectedCount (Finder parentFinder) selector)
-                        model
+                        (\html ->
+                            html
+                                |> Query.fromHtml
+                                |> resolveFinder (Finder parentFinder)
+                                |> (\found ->
+                                        case found of
+                                            Ok parent ->
+                                                parent
+                                                    |> Query.findAll selector
+                                                    |> Query.count
+                                                        (\c ->
+                                                            if c == expectedCount then
+                                                                Expect.pass
+
+                                                            else
+                                                                Expect.fail
+                                                                    ("Expected "
+                                                                        ++ String.fromInt expectedCount
+                                                                        ++ " matches found "
+                                                                        ++ String.fromInt c
+                                                                    )
+                                                        )
+
+                                            Err err ->
+                                                failureToExpectation err
+                                   )
+                        )
 
                 _ ->
-                    { model | result = Err (failureFromDescription "Invalid single finder for seeCount") }
-
-
-seeCountStep : Int -> Page.Finder -> List Selector.Selector -> ProgramState model effect msg -> Expect.Expectation
-seeCountStep expectedCount parentFinder lastFinderPart program =
-    program.model
-        |> program.definition.view
-        |> .body
-        |> Html.node "body" []
-        |> Query.fromHtml
-        |> resolveFinder parentFinder
-        |> Result.andThen
-            (\parent ->
-                parent
-                    |> Query.findAll lastFinderPart
-                    |> Query.count
-                        (\c ->
-                            if c == expectedCount then
-                                Expect.pass
-
-                            else
-                                Expect.fail
-                                    ("Expected "
-                                        ++ String.fromInt expectedCount
-                                        ++ " matches found "
-                                        ++ String.fromInt c
-                                    )
-                        )
-                    |> expectationToResult ()
-            )
-        |> resultToExpectation
+                    stepFail "seeCount" "Invalid single finder for seeCount"
 
 
 {-| Expect a given element to exist exactly once.
 -}
-see : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+see : Page.Element children -> TestState model msg effect -> TestState model msg effect
 see finder =
-    staticStep ("see " ++ finderFriendlyName finder.self) (seeStep finder.self)
+    stepSee ("see " ++ finderFriendlyName finder.self) finder.self
 
 
 {-| Expect a given element to have a descendant w/ the given text.
 -}
-seeText : String -> Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+seeText : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
 seeText expectText element =
     let
         (Finder finder) =
             element.self
     in
-    staticStep ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
-        (seeStep
-            (Finder
-                (finder ++ [ FinderPartSingle "" [ Selector.text expectText ] ])
-            )
+    stepSee ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
+        (Finder
+            (finder ++ [ FinderPartSingle "" [ Selector.text expectText ] ])
         )
 
 
 {-| Expect a given element to not exist. If the target is a sequence of page finders (e.g. `parent.child.grandchild`), `dontSee` only passes if
 `parent`, and `child` exist, but `grandchild` does not. Otherwise, it's too easy for `dontSee` to inadvertantly pass.
 -}
-dontSee : Page.Element children -> ProgramState model effect msg -> ProgramState model effect msg
+dontSee : Page.Element children -> TestState model msg effect -> TestState model msg effect
 dontSee finder =
-    staticStep ("dontSee " ++ finderFriendlyName finder.self) (dontSeeStep finder.self)
+    stepDontSee ("dontSee " ++ finderFriendlyName finder.self) finder.self
 
 
 resolveFinder : Page.Finder -> Query.Single msg -> Result Failure (Query.Single msg)
@@ -504,11 +677,30 @@ resolveFinder (Finder finder) query =
                                 in
                                 case failure of
                                     Nothing ->
-                                        Ok
-                                            (parent
-                                                |> Query.findAll selector
-                                                |> Query.index index
-                                            )
+                                        let
+                                            expectCount =
+                                                parent
+                                                    |> Query.findAll selector
+                                                    |> Query.count
+                                                        (\c ->
+                                                            if c <= index then
+                                                                Expect.fail ("Expected to find at least " ++ String.fromInt (index + 1) ++ " matches but found " ++ String.fromInt c)
+
+                                                            else
+                                                                Expect.pass
+                                                        )
+                                                    |> expectationToFailure
+                                        in
+                                        case expectCount of
+                                            Just f ->
+                                                Err f
+
+                                            Nothing ->
+                                                Ok
+                                                    (parent
+                                                        |> Query.findAll selector
+                                                        |> Query.index index
+                                                    )
 
                                     Just f ->
                                         Err f
@@ -518,76 +710,76 @@ resolveFinder (Finder finder) query =
         finder
 
 
-seeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
-seeStep finder program =
-    program.model
-        |> program.definition.view
-        |> .body
-        |> Html.node "body" []
-        |> Query.fromHtml
-        |> resolveFinder finder
-        |> resultToExpectation
+stepSee : StepDescription -> Page.Finder -> TestState model msg effect -> TestState model msg effect
+stepSee description finder =
+    stepExpectView description
+        (\html ->
+            html
+                |> Query.fromHtml
+                |> resolveFinder finder
+                |> resultToExpectation
+        )
 
 
-dontSeeStep : Page.Finder -> ProgramState model effect msg -> Expect.Expectation
-dontSeeStep (Finder finder) program =
+stepDontSee : StepDescription -> Page.Finder -> TestState model msg effect -> TestState model msg effect
+stepDontSee description (Finder finder) =
     finder
         |> List.reverse
         |> (\reversed ->
                 case reversed of
                     [] ->
-                        Expect.fail "No selector provided"
+                        stepFail description "No selector provided"
 
                     lastFinder :: rest ->
                         let
                             parentFinder =
                                 List.reverse rest
                         in
-                        dontSeeChildStep (Finder parentFinder) lastFinder program
+                        stepDontSeeChild description (Finder parentFinder) lastFinder
            )
 
 
-dontSeeChildStep : Page.Finder -> FinderPart -> ProgramState model effect msg -> Expect.Expectation
-dontSeeChildStep parentFinder childFinder program =
-    let
-        parentResult =
-            program.model
-                |> program.definition.view
-                |> .body
-                |> Html.node "body" []
-                |> Query.fromHtml
-                |> resolveFinder parentFinder
-    in
-    case parentResult of
-        Ok parent ->
-            case childFinder of
-                FinderPartSingle _ selector ->
-                    parent
-                        |> Query.hasNot selector
+stepDontSeeChild : StepDescription -> Page.Finder -> FinderPart -> TestState model msg effect -> TestState model msg effect
+stepDontSeeChild description parentFinder childFinder =
+    stepExpectView description
+        (\html ->
+            let
+                parentResult =
+                    html
+                        |> Query.fromHtml
+                        |> resolveFinder parentFinder
+            in
+            case parentResult of
+                Ok parent ->
+                    case childFinder of
+                        FinderPartSingle _ selector ->
+                            parent
+                                |> Query.hasNot selector
 
-                FinderPartMultiple _ selector index ->
-                    parent
-                        |> Query.findAll selector
-                        |> Query.index index
-                        |> Query.has []
-                        |> expectationToFailure
-                        |> (\failureToFind ->
-                                case failureToFind of
-                                    Just _ ->
-                                        Expect.pass
+                        FinderPartMultiple _ selector index ->
+                            parent
+                                |> Query.findAll selector
+                                |> Query.index index
+                                |> Query.has []
+                                |> expectationToFailure
+                                |> (\failureToFind ->
+                                        case failureToFind of
+                                            Just _ ->
+                                                Expect.pass
 
-                                    Nothing ->
-                                        parent
-                                            |> Query.hasNot selector
-                                            |> prependExpectationDescription
-                                                ("found at least "
-                                                    ++ String.fromInt (index + 1)
-                                                    ++ "matching selector\n"
-                                                )
-                           )
+                                            Nothing ->
+                                                parent
+                                                    |> Query.hasNot selector
+                                                    |> prependExpectationDescription
+                                                        ("found at least "
+                                                            ++ String.fromInt (index + 1)
+                                                            ++ "matching selector\n"
+                                                        )
+                                   )
 
-        Err failure ->
-            failureToExpectation failure
+                Err failure ->
+                    failureToExpectation failure
+        )
 
 
 finderFriendlyName : Finder -> String
@@ -603,6 +795,13 @@ finderFriendlyName (Finder f) =
                         name ++ "[" ++ String.fromInt index ++ "]"
             )
         |> String.join "."
+        |> (\s ->
+                if s == "" then
+                    "<root element>"
+
+                else
+                    s
+           )
 
 
 type alias Failure =
@@ -661,37 +860,60 @@ type alias StepDescription =
     String
 
 
-type alias Step model effect msg =
-    ProgramState model effect msg -> Result Failure ( model, List effect )
+view : ProgramDefinition model msg effect -> Html.Html msg
+view program =
+    case program of
+        ProgramDefinitionApplication p ->
+            p.model
+                |> p.view
+                |> .body
+                |> Html.node "body" []
+
+        ProgramDefinitionSandbox p ->
+            p.view p.model
+
+        ProgramDefinitionElement p ->
+            p.view p.model
+
+        ProgramDefinitionDocument p ->
+            p.model
+                |> p.view
+                |> .body
+                |> Html.node "body" []
+
+        ProgramDefinitionHtml p ->
+            p
 
 
-type alias StaticStep model effect msg =
-    ProgramState model effect msg -> Expect.Expectation
+stepSimulateEvent :
+    StepDescription
+    -> ( String, Json.Encode.Value )
+    -> Finder
+    -> TestState model msg effect
+    -> TestState model msg effect
+stepSimulateEvent description event finder =
+    step description
+        (\program effects ->
+            program
+                |> view
+                |> Query.fromHtml
+                |> resolveFinder finder
+                |> Result.andThen
+                    (\found ->
+                        let
+                            err =
+                                found
+                                    |> Event.simulate event
+                                    |> Event.toResult
+                        in
+                        case err of
+                            Err e ->
+                                Err (failureFromDescription e)
 
-
-simulateEventStep : ( String, Json.Encode.Value ) -> Finder -> Step model effect msg
-simulateEventStep event finder program =
-    program.model
-        |> program.definition.view
-        |> .body
-        |> Html.node "body" []
-        |> Query.fromHtml
-        |> resolveFinder finder
-        |> Result.andThen
-            (\found ->
-                let
-                    err =
-                        found
-                            |> Event.simulate event
-                            |> Event.toResult
-                in
-                case err of
-                    Err e ->
-                        Err (failureFromDescription e)
-
-                    Ok msg ->
-                        Ok (program.definition.update msg program.model)
-            )
+                            Ok msg ->
+                                update msg program effects
+                    )
+        )
 
 
 failureWithStepsDescription :
@@ -701,44 +923,73 @@ failureWithStepsDescription :
     -> Failure
 failureWithStepsDescription passedSteps failedStep failure =
     passedSteps
-        |> List.map (\s -> "[Passed] " ++ s)
-        |> (\l -> l ++ [ "[Failed] " ++ failedStep ++ ":\n" ++ failure.description ])
-        |> List.indexedMap (\stepIndex stepDescription -> String.fromInt (stepIndex + 1) ++ ". " ++ stepDescription)
+        |> List.map (\s -> "✓ " ++ s)
+        |> (\l -> l ++ [ "✗ " ++ failedStep ++ ":\n" ++ Test.Runner.Failure.format failure.description failure.reason ])
         |> String.join "\n"
-        |> (\description -> { failure | description = description })
+        |> failureFromDescription
 
 
-staticStep : StepDescription -> StaticStep model effect msg -> ProgramState model effect msg -> ProgramState model effect msg
-staticStep stepDescription currentStep programState =
-    step stepDescription
-        (\program ->
-            currentStep program
-                |> expectationToResult ( program.model, program.pendingEffects )
+stepExpectProgram :
+    StepDescription
+    -> (ProgramDefinition model msg effect -> Expect.Expectation)
+    -> TestState model msg effect
+    -> TestState model msg effect
+stepExpectProgram description fn =
+    step description
+        (\program effects ->
+            fn program
+                |> expectationToResult ( program, effects )
         )
-        programState
 
 
-step : StepDescription -> Step model effect msg -> ProgramState model effect msg -> ProgramState model effect msg
-step stepDescription currentStep programState =
-    case programState.result of
+stepExpectView :
+    StepDescription
+    -> (Html.Html msg -> Expect.Expectation)
+    -> TestState model msg effect
+    -> TestState model msg effect
+stepExpectView description fn =
+    step description
+        (\program effects ->
+            program
+                |> view
+                |> fn
+                |> expectationToResult ( program, effects )
+        )
+
+
+stepFail :
+    StepDescription
+    -> String
+    -> TestState model msg effect
+    -> TestState model msg effect
+stepFail description reason =
+    step description (\_ _ -> Err (failureFromDescription reason))
+
+
+step :
+    StepDescription
+    -> (ProgramDefinition model msg effect -> List effect -> Result Failure ( ProgramDefinition model msg effect, List effect ))
+    -> TestState model msg effect
+    -> TestState model msg effect
+step stepDescription fn testState =
+    case testState.result of
         Err _ ->
-            programState
+            testState
 
         Ok stepsProcessed ->
             let
                 result =
-                    currentStep programState
+                    fn testState.program testState.pendingEffects
             in
             case result of
                 Err f ->
-                    { programState
+                    { testState
                         | result = Err (failureWithStepsDescription stepsProcessed stepDescription f)
                     }
 
-                Ok ( newModel, newEffects ) ->
-                    { programState
-                        | model = newModel
+                Ok ( newProgram, newEffects ) ->
+                    { testState
+                        | program = newProgram
                         , result = Ok (stepsProcessed ++ [ stepDescription ])
                         , pendingEffects = newEffects
                     }
-
