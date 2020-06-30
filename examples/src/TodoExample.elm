@@ -279,7 +279,12 @@ view model =
                         )
                 )
             , div []
-                [ input [ type_ "text", onInput NewItemLabelUpdated, value model.newItemLabel, attribute "data-test" "add-item-text-input" ] []
+                [ input [ type_ "text",
+                    onInput NewItemLabelUpdated,
+                    value model.newItemLabel,
+                    attribute "data-test" "add-item-text-input",
+                    classList [("is-processing-addition", model.isAdding)]
+                ] []
                 , if model.isAdding then
                     div [ attribute "data-test" "add-item-loader" ] [ text "loading..." ]
 

@@ -9,7 +9,7 @@ module TestJourney exposing
     , handleEffect, EffectHandlerResult(..)
     , injectMsg
     , blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
-    , see, dontSee, seeCount, seeText
+    , see, dontSee, seeCount, seeText, seeClass
     )
 
 {-| Write easy-to-maintain acceptance-like tests.
@@ -50,7 +50,7 @@ module TestJourney exposing
 
 To be used with your [`page`](../Page#page)
 
-@docs see, dontSee, seeCount, seeText
+@docs see, dontSee, seeCount, seeText, seeClass
 
 -}
 
@@ -606,18 +606,30 @@ see finder =
     stepSee ("see " ++ finderFriendlyName finder.self) finder.self
 
 
-{-| Expect a given element to have a descendant w/ the given text.
--}
-seeText : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
-seeText expectText element =
+stepSeeProperty : String -> List Selector.Selector -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+stepSeeProperty label selector element =
     let
         (Finder finder) =
             element.self
     in
-    stepSee ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
+    stepSee (label ++ " at " ++ finderFriendlyName (Finder finder))
         (Finder
-            (finder ++ [ FinderPartSingle "" [ Selector.text expectText ] ])
+            (finder ++ [ FinderPartSingle "" selector ])
         )
+
+
+{-| Expect a given element to have a descendant w/ the given text.
+-}
+seeText : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeText expect =
+    stepSeeProperty ("seeText \"" ++ expect ++ "\"") [ Selector.text expect ]
+
+
+{-| Expect a given element to have a descendant w/ the given text.
+-}
+seeClass : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeClass expect =
+    stepSeeProperty ("seeClass \"" ++ expect ++ "\"") [ Selector.class expect ]
 
 
 {-| Expect a given element to not exist. If the target is a sequence of page finders (e.g. `parent.child.grandchild`), `dontSee` only passes if
@@ -640,26 +652,31 @@ resolveFinder (Finder finder) query =
                                 let
                                     failure =
                                         parent
-                                            |> Expect.all
-                                                [ Query.has selector
-                                                , \p ->
-                                                    p
-                                                        |> Query.findAll selector
-                                                        |> Query.count
-                                                            (\count ->
-                                                                if count == 1 then
-                                                                    Expect.pass
-
-                                                                else
-                                                                    Expect.fail
-                                                                        ("Expected to find just 1 "
-                                                                            ++ friendlyName
-                                                                            ++ " but found "
-                                                                            ++ String.fromInt count
-                                                                        )
-                                                            )
-                                                ]
+                                            |> Query.has selector
                                             |> expectationToFailure
+                                            |> (\notFoundOnSelfFailure ->
+                                                    case notFoundOnSelfFailure of
+                                                        Just _ ->
+                                                            parent
+                                                                |> Query.findAll selector
+                                                                |> Query.count
+                                                                    (\count ->
+                                                                        if count == 1 then
+                                                                            Expect.pass
+
+                                                                        else
+                                                                            Expect.fail
+                                                                                ("Expected to find just 1 "
+                                                                                    ++ friendlyName
+                                                                                    ++ " but found "
+                                                                                    ++ String.fromInt count
+                                                                                )
+                                                                    )
+                                                                |> expectationToFailure
+
+                                                        Nothing ->
+                                                            Nothing
+                                               )
                                 in
                                 case failure of
                                     Nothing ->

@@ -28,6 +28,7 @@ suite =
                     |> J.dontSee page.addItemLoader
                     |> J.click page.addItemButton
                     |> J.see page.addItemLoader
+                    |> J.seeClass "is-processing-addition" page.addItemTextInput
                     |> J.handleEffect
                         (\effect ->
                             case effect of
