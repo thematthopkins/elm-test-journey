@@ -282,6 +282,7 @@ view model =
                 [ input [ type_ "text",
                     onInput NewItemLabelUpdated,
                     value model.newItemLabel,
+                    disabled model.isAdding,
                     attribute "data-test" "add-item-text-input",
                     classList [("is-processing-addition", model.isAdding)]
                 ] []
