@@ -4,12 +4,14 @@ module TestJourney exposing
     , startElement, ElementProgram
     , startDocument, DocumentProgram
     , startView
+    , TestState
     , finish
     , mapModel, expectModel
     , handleEffect, EffectHandlerResult(..)
     , injectMsg
     , blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
-    , see, dontSee, seeCount, seeText
+    , see, seeCount, seeText, seeClass, seeAttribute, seeChecked, seeUnchecked, seeDisabled, seeNotDisabled, seeHref, seeSrc, seeValue
+    , dontSee, dontSeeClass
     )
 
 {-| Write easy-to-maintain acceptance-like tests.
@@ -22,6 +24,8 @@ module TestJourney exposing
 @docs startElement, ElementProgram
 @docs startDocument, DocumentProgram
 @docs startView
+
+@docs TestState
 
 @docs finish
 
@@ -50,13 +54,16 @@ module TestJourney exposing
 
 To be used with your [`page`](../Page#page)
 
-@docs see, dontSee, seeCount, seeText
+@docs see, seeCount, seeText, seeClass, seeAttribute, seeChecked, seeUnchecked, seeDisabled, seeNotDisabled, seeHref, seeSrc, seeValue
+
+@docs dontSee, dontSeeClass
 
 -}
 
 import Browser
 import Expect
 import Html
+import Html.Attributes
 import Json.Encode
 import Test.Html.Event as Event
 import Test.Html.Query as Query
@@ -169,10 +176,11 @@ type ProgramDefinition model msg effect
 
 start : ProgramDefinition model msg effect -> TestState model msg effect
 start program =
-    { program = program
-    , pendingEffects = []
-    , result = Ok []
-    }
+    TestState
+        { program = program
+        , pendingEffects = []
+        , result = Ok []
+        }
 
 
 programEffectToString : ProgramDefinition model msg effect -> Maybe (effect -> String)
@@ -198,7 +206,7 @@ programEffectToString program =
 pending effects left to process, since that is usually inadvertant in practice.
 -}
 finish : TestState model msg effect -> Expect.Expectation
-finish testState =
+finish (TestState testState) =
     case testState.result of
         Err e ->
             failureToExpectation e
@@ -327,15 +335,15 @@ This is usually simulating the other end of your effect. In the case of an effec
 
 -}
 handleEffect : (effect -> EffectHandlerResult msg) -> TestState model msg effect -> TestState model msg effect
-handleEffect fn testState =
+handleEffect fn (TestState testState) =
     case testState.pendingEffects of
         [] ->
-            stepFail "handleEffect" "attempted to handle effect when no effects were generated or no pending effects remain" testState
+            stepFail "handleEffect" "attempted to handle effect when no effects were generated or no pending effects remain" (TestState testState)
 
         nextEffect :: remainingEffects ->
             case programEffectToString testState.program of
                 Nothing ->
-                    stepFail "handleEffect" "Operation not permitted for startSandbox.  Try startElement for programs with effects." testState
+                    stepFail "handleEffect" "Operation not permitted for startSandbox.  Try startElement for programs with effects." (TestState testState)
 
                 Just effectToString ->
                     step ("handleEffect " ++ effectToString nextEffect)
@@ -356,7 +364,7 @@ handleEffect fn testState =
                                 EffectUnexpected ->
                                     Err (failureFromDescription ("Unhandled effect: " ++ effectToString nextEffect))
                         )
-                        testState
+                        (TestState testState)
 
 
 {-| The results returned by [`handleEffect`](#handleEffect). Returns either an `EffectProcessed` w/ an `Expectation` and the msg to be sent to the `update` function of the application under test.
@@ -366,7 +374,13 @@ type EffectHandlerResult msg
     | EffectUnexpected
 
 
-type alias TestState model msg effect =
+{-| The state of the elm program under test, and its pending effects. Create using one of the `start*` functions.
+-}
+type TestState model msg effect
+    = TestState (TestStateRecord model msg effect)
+
+
+type alias TestStateRecord model msg effect =
     { program : ProgramDefinition model msg effect
     , pendingEffects : List effect
     , result : Result Failure (List StepDescription)
@@ -606,18 +620,93 @@ see finder =
     stepSee ("see " ++ finderFriendlyName finder.self) finder.self
 
 
-{-| Expect a given element to have a descendant w/ the given text.
--}
-seeText : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
-seeText expectText element =
+stepSeeProperty : String -> List Selector.Selector -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+stepSeeProperty label selector element =
     let
         (Finder finder) =
             element.self
     in
-    stepSee ("seeText \"" ++ expectText ++ "\" at " ++ finderFriendlyName (Finder finder))
+    stepSee (label ++ " in " ++ finderFriendlyName (Finder finder))
         (Finder
-            (finder ++ [ FinderPartSingle "" [ Selector.text expectText ] ])
+            (finder ++ [ FinderPartSingle "" selector ])
         )
+
+
+{-| Expect text within itself or a descendant.
+-}
+seeText : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeText expect =
+    stepSeeProperty ("seeText \"" ++ expect ++ "\"") [ Selector.text expect ]
+
+
+{-| Expect a class to exist on the element or a descendant.
+-}
+seeClass : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeClass expect =
+    stepSeeProperty ("seeClass \"" ++ expect ++ "\"") [ Selector.class expect ]
+
+
+{-| Expect a value attribute to exist on the element or a descendant.
+-}
+seeValue : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeValue expect =
+    stepSeeProperty ("seeValue \"" ++ expect ++ "\"") [ Selector.attribute (Html.Attributes.value expect) ]
+
+
+{-| Expect a class to not exist on the element and it's descendants.
+-}
+dontSeeClass : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+dontSeeClass expect =
+    stepDontSeeProperty ("dontSeeClass \"" ++ expect ++ "\"") [ Selector.class expect ]
+
+
+{-| Expect an attribute attribute to exist on the element or a descendant.
+-}
+seeAttribute : String -> String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeAttribute attrName expect =
+    stepSeeProperty ("seeAttribute \"[" ++ attrName ++ "=" ++ expect ++ "]\"") [ Selector.attribute (Html.Attributes.attribute attrName expect) ]
+
+
+{-| Expect an href attribute attribute to exist on the element or a descendant.
+-}
+seeHref : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeHref expect =
+    stepSeeProperty ("seeHref \"" ++ expect ++ "\"") [ Selector.attribute (Html.Attributes.href expect) ]
+
+
+{-| Expect a src attribute to exist on the element or a descendant.
+-}
+seeSrc : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeSrc expect =
+    stepSeeProperty ("seeSrc \"" ++ expect ++ "\"") [ Selector.attribute (Html.Attributes.src expect) ]
+
+
+{-| Expect a disabled attribute to exist on the element or a descendant.
+-}
+seeDisabled : Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeDisabled =
+    stepSeeProperty "seeDisabled" [ Selector.disabled True ]
+
+
+{-| Expect a disabled attribute be false on an element or a descendant.
+-}
+seeNotDisabled : Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeNotDisabled =
+    stepSeeProperty "seeNotDisabled" [ Selector.disabled False ]
+
+
+{-| Expect the element or a descendant to be checked.
+-}
+seeChecked : Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeChecked =
+    stepSeeProperty "seeChecked" [ Selector.checked True ]
+
+
+{-| Expect the element or a descendant to be unchecked.
+-}
+seeUnchecked : Page.Element children -> TestState model msg effect -> TestState model msg effect
+seeUnchecked =
+    stepSeeProperty "seeUnchecked" [ Selector.checked False ]
 
 
 {-| Expect a given element to not exist. If the target is a sequence of page finders (e.g. `parent.child.grandchild`), `dontSee` only passes if
@@ -636,30 +725,29 @@ resolveFinder (Finder finder) query =
                 |> Result.andThen
                     (\parent ->
                         case finderPart of
-                            FinderPartSingle friendlyName selector ->
+                            FinderPartSingle _ [] ->
+                                -- Empty selectors are frequently used to represent the root element.
+                                -- Skip finding, since we know the parent already has what we're looking for, and
+                                -- doing an extra find will display this extra noop in expectation failures.
+                                parentResult
+
+                            FinderPartSingle _ selector ->
                                 let
                                     failure =
                                         parent
-                                            |> Expect.all
-                                                [ Query.has selector
-                                                , \p ->
-                                                    p
-                                                        |> Query.findAll selector
-                                                        |> Query.count
-                                                            (\count ->
-                                                                if count == 1 then
-                                                                    Expect.pass
-
-                                                                else
-                                                                    Expect.fail
-                                                                        ("Expected to find just 1 "
-                                                                            ++ friendlyName
-                                                                            ++ " but found "
-                                                                            ++ String.fromInt count
-                                                                        )
-                                                            )
-                                                ]
+                                            |> Query.has selector
                                             |> expectationToFailure
+                                            |> (\notFoundOnSelfFailure ->
+                                                    case notFoundOnSelfFailure of
+                                                        Just _ ->
+                                                            parent
+                                                                |> Query.find selector
+                                                                |> Query.has []
+                                                                |> expectationToFailure
+
+                                                        Nothing ->
+                                                            Nothing
+                                               )
                                 in
                                 case failure of
                                     Nothing ->
@@ -718,6 +806,18 @@ stepSee description finder =
                 |> Query.fromHtml
                 |> resolveFinder finder
                 |> resultToExpectation
+        )
+
+
+stepDontSeeProperty : String -> List Selector.Selector -> Page.Element children -> TestState model msg effect -> TestState model msg effect
+stepDontSeeProperty label selector element =
+    let
+        (Finder finder) =
+            element.self
+    in
+    stepDontSee (label ++ " in " ++ finderFriendlyName (Finder finder))
+        (Finder
+            (finder ++ [ FinderPartSingle "" selector ])
         )
 
 
@@ -971,10 +1071,10 @@ step :
     -> (ProgramDefinition model msg effect -> List effect -> Result Failure ( ProgramDefinition model msg effect, List effect ))
     -> TestState model msg effect
     -> TestState model msg effect
-step stepDescription fn testState =
+step stepDescription fn (TestState testState) =
     case testState.result of
         Err _ ->
-            testState
+            TestState testState
 
         Ok stepsProcessed ->
             let
@@ -983,13 +1083,15 @@ step stepDescription fn testState =
             in
             case result of
                 Err f ->
-                    { testState
-                        | result = Err (failureWithStepsDescription stepsProcessed stepDescription f)
-                    }
+                    TestState
+                        { testState
+                            | result = Err (failureWithStepsDescription stepsProcessed stepDescription f)
+                        }
 
                 Ok ( newProgram, newEffects ) ->
-                    { testState
-                        | program = newProgram
-                        , result = Ok (stepsProcessed ++ [ stepDescription ])
-                        , pendingEffects = newEffects
-                    }
+                    TestState
+                        { testState
+                            | program = newProgram
+                            , result = Ok (stepsProcessed ++ [ stepDescription ])
+                            , pendingEffects = newEffects
+                        }

@@ -26,8 +26,11 @@ suite =
                     |> J.see page
                     |> J.input "myNewItem" page.addItemTextInput
                     |> J.dontSee page.addItemLoader
+                    |> J.seeNotDisabled page.addItemTextInput
                     |> J.click page.addItemButton
                     |> J.see page.addItemLoader
+                    |> J.seeDisabled page.addItemTextInput
+                    |> J.seeClass "is-processing-addition" page.addItemTextInput
                     |> J.handleEffect
                         (\effect ->
                             case effect of
