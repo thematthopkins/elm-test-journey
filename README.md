@@ -38,8 +38,11 @@ The page object pattern separates the test's knowledge of the HTML's structure f
 
 See [TodoExamplePage](https://github.com/thematthopkins/elm-test-journey/blob/master/examples/tests/TodoExamplePage.elm)
 
-## Testing Incoming Ports / Subscriptions / Url Changes / etc. ##
+## Testing Ports ##
+`elm-test-journey` expects you to wrap your Ports in Effects.  Unlike HTTP request though, ports are fire-and-forget and don't generate Msgs.  When running `TestJourney.handleEffect` to handle Ports, you'll use `TestJourney.EffectSeen` instead of `TestJourney.EffectProcessed` to avoid dealing w/ `Msg`s.
 
-`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created from the port/subscription/etc.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port/subscription/etc -> Msg` conversion via traditional unit testing.
+## Testing Subscriptions ##
+
+`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created from the subscription.
 
 This is where `elm-test-journey`'s approach differs from [elm-test-program](https://github.com/avh4/elm-program-test).  If you'd like to incorporate tests for these lower-level events more directly into your acceptance tests, [elm-test-program](https://github.com/avh4/elm-program-test) may be a better option.

@@ -91,7 +91,8 @@ single (Internal.Finder parent) friendlyName selector =
             (\rootElement ->
                 { self = rootElement
                 , myElementWithChildren =
-                    singleRecord "myChildElement"
+                    singleRecord rootElement
+                        "myChildElement"
                         [ Selector.attribute (Attributes.attribute "data-test" "myChildElement") ]
                         (\myElementWithChildren ->
                             { self = myElementWithChildren
@@ -203,7 +204,8 @@ singleTestAttr parent testAttr =
             (\rootElement ->
                 { self = rootElement
                 , myElementWithChildren =
-                    singleRecord "myChildElement"
+                    singleRecord rootElement
+                        "myChildElement"
                         (\myElementWithChildren ->
                             { self = myElementWithChildren
                             , childOfChild = singleTestAttr myElementWithChildren "childOfChild"

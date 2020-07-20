@@ -37,8 +37,8 @@ suite =
                                 TodoExample.EffectAddItem msg input ->
                                     J.EffectProcessed
                                         (Expect.equal
-                                            input
                                             "myNewItem"
+                                            input
                                         )
                                         (msg
                                             (Ok (TodoExample.TodoItemID 55))
@@ -52,6 +52,26 @@ suite =
                     |> J.seeCount 1 page.items
                     |> J.see (page.items 0)
                     |> J.seeText "myNewItem" (page.items 0 |> .label)
+                    |> J.finish
+        , test "Add Item With No Text" <|
+            \_ ->
+                J.startDocument program
+                    |> J.see page
+                    |> J.click page.addItemButton
+                    |> J.dontSee page.addItemLoader
+                    |> J.handleEffect
+                        (\effect ->
+                            case effect of
+                                TodoExample.EffectShowAlertModal alertMessage ->
+                                    J.EffectSeen
+                                        (Expect.equal
+                                            "Enter an item name to add"
+                                            alertMessage
+                                        )
+
+                                _ ->
+                                    J.EffectUnexpected
+                        )
                     |> J.finish
         , test "Remove Item" <|
             \_ ->
@@ -84,8 +104,8 @@ suite =
                                 TodoExample.EffectRemoveItem msg id ->
                                     J.EffectProcessed
                                         (Expect.equal
-                                            id
                                             (TodoExample.TodoItemID 23)
+                                            id
                                         )
                                         (msg
                                             (Ok ())
