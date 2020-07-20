@@ -1,4 +1,4 @@
-module TodoExample exposing
+port module TodoExample exposing
     ( Effect(..)
     , Model
     , Msg(..)
@@ -6,6 +6,7 @@ module TodoExample exposing
     , TodoItemStatus(..)
     , emptyModel
     , main
+    , showAlertModal
     , subscriptions
     , update
     , view
@@ -19,6 +20,11 @@ import Http
 import Process
 import Task
 import Time
+
+
+{-| Not actually wired up when viewed in elm-reactor, but serves as an example of how to test ports.
+-}
+port showAlertModal : String -> Cmd msg
 
 
 main : Program () Model Msg
@@ -54,6 +60,7 @@ type Effect msg
     = EffectAddItem (Result Http.Error TodoItemID -> msg) String
     | EffectRemoveItem (Result Http.Error () -> msg) TodoItemID
     | EffectUpdateItemStatus (Result Http.Error () -> msg) TodoItemID TodoItemStatus
+    | EffectShowAlertModal String
 
 
 mapEffect : (a -> msg) -> Effect a -> Effect msg
@@ -67,6 +74,9 @@ mapEffect fn effect =
 
         EffectUpdateItemStatus m a b ->
             EffectUpdateItemStatus (m >> fn) a b
+
+        EffectShowAlertModal a ->
+            EffectShowAlertModal a
 
 
 mapEffects : (a -> msg) -> Effects a -> Effects msg
@@ -164,9 +174,15 @@ update : Msg -> Model -> ( Model, Effects Msg )
 update msg model =
     case msg of
         AddItem label ->
-            ( { model | isAdding = True }
-            , [ EffectAddItem (AddItemComplete label) label ]
-            )
+            if String.trim label == "" then
+                ( model
+                , [ EffectShowAlertModal "Enter an item name to add" ]
+                )
+
+            else
+                ( { model | isAdding = True }
+                , [ EffectAddItem (AddItemComplete label) label ]
+                )
 
         NewItemLabelUpdated label ->
             ( { model | newItemLabel = label }
@@ -279,13 +295,15 @@ view model =
                         )
                 )
             , div []
-                [ input [ type_ "text",
-                    onInput NewItemLabelUpdated,
-                    value model.newItemLabel,
-                    disabled model.isAdding,
-                    attribute "data-test" "add-item-text-input",
-                    classList [("is-processing-addition", model.isAdding)]
-                ] []
+                [ input
+                    [ type_ "text"
+                    , onInput NewItemLabelUpdated
+                    , value model.newItemLabel
+                    , disabled model.isAdding
+                    , attribute "data-test" "add-item-text-input"
+                    , classList [ ( "is-processing-addition", model.isAdding ) ]
+                    ]
+                    []
                 , if model.isAdding then
                     div [ attribute "data-test" "add-item-loader" ] [ text "loading..." ]
 
@@ -321,3 +339,6 @@ toCmd e =
         EffectUpdateItemStatus msg _ _ ->
             Process.sleep 2.0
                 |> Task.perform (\_ -> msg (Ok ()))
+
+        EffectShowAlertModal text ->
+            showAlertModal text

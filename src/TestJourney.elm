@@ -361,16 +361,71 @@ handleEffect fn (TestState testState) =
                                         Nothing ->
                                             update msg prog remainingEffects
 
+                                EffectSeen expect ->
+                                    let
+                                        failure =
+                                            expectationToFailure expect
+                                    in
+                                    case failure of
+                                        Just f ->
+                                            Err f
+
+                                        Nothing ->
+                                            Ok ( prog, remainingEffects )
+
                                 EffectUnexpected ->
                                     Err (failureFromDescription ("Unhandled effect: " ++ effectToString nextEffect))
                         )
                         (TestState testState)
 
 
-{-| The results returned by [`handleEffect`](#handleEffect). Returns either an `EffectProcessed` w/ an `Expectation` and the msg to be sent to the `update` function of the application under test.
+{-| Used by [`handleEffect`](#handleEffect) to create expectations around the next Effect, and optionally inject a message simulating the result of the effect.
+
+To play the part of the server in an http request, use `EffectProcessed`:
+
+        J.startDocument program
+            |> J.click page.addItemButton
+            |> J.handleEffect
+                (\effect ->
+                    case effect of
+                        TodoExample.EffectAddItem msg input ->
+                            J.EffectProcessed
+                                (Expect.equal
+                                    "myNewItem"
+                                    input
+                                )
+                                (msg
+                                    (Ok ())
+                                )
+
+                        _ ->
+                            J.EffectUnexpected
+                )
+            |> J.finish
+
+To perform expectations on an effect without generating an msg (useful for testing `port`s, which are fire-and-forget):
+
+        J.startDocument program
+            |> J.click page.addItemButton
+            |> J.handleEffect
+                (\effect ->
+                    case effect of
+                        TodoExample.EffectPopJsAlert alertText ->
+                            J.EffectSeen
+                                (Expect.equal
+                                    "Item already exists"
+                                    alertText
+                                )
+
+                        _ ->
+                            J.EffectUnexpected
+                )
+            |> J.finish
+
 -}
 type EffectHandlerResult msg
     = EffectProcessed Expect.Expectation msg
+    | EffectSeen Expect.Expectation
     | EffectUnexpected
 
 
