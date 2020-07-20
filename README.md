@@ -43,6 +43,6 @@ See [TodoExamplePage](https://github.com/thematthopkins/elm-test-journey/blob/ma
 
 ## Testing Subscriptions ##
 
-`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created from the subscription.  This makes your `elm-test-journey` tests cleaner, and you can still test your `port/subscription/etc -> Msg` conversion via traditional unit testing.
+`elm-test-journey` addresses these by using `TestJourney.injectMsg`.  This allows you to simulate the `Msg` that your application would have created from the subscription.
 
 This is where `elm-test-journey`'s approach differs from [elm-test-program](https://github.com/avh4/elm-program-test).  If you'd like to incorporate tests for these lower-level events more directly into your acceptance tests, [elm-test-program](https://github.com/avh4/elm-program-test) may be a better option.
