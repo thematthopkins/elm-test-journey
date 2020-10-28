@@ -246,5 +246,15 @@ suite =
                         , ""
                         , "✗ Query.find always expects to find 1 element, but it found 0 instead."
                         ]
+         , test "Fail" <|
+            \_ ->
+                J.startView subjectView
+                    |> J.fail "Explicit failure made"
+                    |> J.finish
+                    |> Test.Runner.getFailureReason
+                    |> expectFailureDescription
+                        [ "✗ fail:"
+                        , "Explicit failure made"
+                        ]
          ]
         )
