@@ -12,6 +12,7 @@ module TestJourney exposing
     , blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
     , see, seeCount, seeText, seeClass, seeAttribute, seeChecked, seeUnchecked, seeDisabled, seeNotDisabled, seeHref, seeSrc, seeValue
     , dontSee, dontSeeClass
+    , fail
     )
 
 {-| Write easy-to-maintain acceptance-like tests.
@@ -57,6 +58,8 @@ To be used with your [`page`](../Page#page)
 @docs see, seeCount, seeText, seeClass, seeAttribute, seeChecked, seeUnchecked, seeDisabled, seeNotDisabled, seeHref, seeSrc, seeValue
 
 @docs dontSee, dontSeeClass
+
+@docs fail
 
 -}
 
@@ -713,6 +716,13 @@ seeValue expect =
 dontSeeClass : String -> Page.Element children -> TestState model msg effect -> TestState model msg effect
 dontSeeClass expect =
     stepDontSeeProperty ("dontSeeClass \"" ++ expect ++ "\"") [ Selector.class expect ]
+
+
+{-| Cause the test to fail. Useful in cases where we want to fail during model construction, before the test gets going.
+-}
+fail : String -> TestState model msg effect -> TestState model msg effect
+fail reason =
+    step "fail" (\_ _ -> Err (failureFromDescription reason))
 
 
 {-| Expect an attribute attribute to exist on the element or a descendant.
