@@ -130,9 +130,9 @@ singleRecord (Internal.Finder parent) friendlyName selector fn =
         page.myListItem 1
 
 -}
-multiple : Finder -> FriendlyName -> List Selector.Selector -> Int -> Finder
+multiple : Finder -> FriendlyName -> List Selector.Selector -> Int -> Element {}
 multiple (Internal.Finder parent) friendlyName selector index =
-    Internal.Finder (parent ++ [ FinderPartMultiple friendlyName selector index ])
+    { self = Internal.Finder (parent ++ [ FinderPartMultiple friendlyName selector index ]) }
 
 
 {-| Represents a list of nodes w/ custom children.
@@ -166,8 +166,8 @@ multipleRecord :
     -> (Finder -> Element children)
     -> Int
     -> Element children
-multipleRecord parent friendlyName selector fn index =
-    multiple parent friendlyName selector index
+multipleRecord (Internal.Finder parent) friendlyName selector fn index =
+    Internal.Finder (parent ++ [ FinderPartMultiple friendlyName selector index ])
         |> fn
 
 
@@ -238,7 +238,7 @@ singleRecordTestAttr parent testAttr fn =
         page.myListItem 1
 
 -}
-multipleTestAttr : Finder -> String -> Int -> Finder
+multipleTestAttr : Finder -> String -> Int -> Element {}
 multipleTestAttr parent testAttr index =
     multiple parent testAttr (testAttrSelector testAttr) index
 
