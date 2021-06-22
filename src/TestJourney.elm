@@ -7,7 +7,7 @@ module TestJourney exposing
     , TestState
     , finish
     , mapModel, expectModel
-    , handleEffect, EffectHandlerResult(..)
+    , handleEffect, EffectHandlerResult(..), injectEffects
     , injectMsg
     , blur, check, click, custom, doubleClick, focus, input, mouseDown, mouseEnter, mouseLeave, mouseOut, mouseOver, mouseUp, submit, uncheck
     , see, seeCount, seeText, seeClass, seeAttribute, seeChecked, seeUnchecked, seeDisabled, seeNotDisabled, seeHref, seeSrc, seeValue
@@ -38,7 +38,7 @@ module TestJourney exposing
 
 ## Effects
 
-@docs handleEffect, EffectHandlerResult
+@docs handleEffect, EffectHandlerResult, injectEffects
 
 
 ## Messages
@@ -483,6 +483,16 @@ update msg program effects =
 
         ProgramDefinitionHtml _ ->
             Err (failureFromDescription "invalid opration on startView.  Try startElement so you have an update function.")
+
+
+{-| Queues up the supplied `addedEffects` into application under test, so that `handleEffects` can subsequently be used to process them. This is useful if you have effects created during setup of your application, and need to feed them back into your tests.
+-}
+injectEffects : List effect -> TestState model msg effect -> TestState model msg effect
+injectEffects addedEffects =
+    step "injectEffects"
+        (\program effects ->
+            Ok ( program, effects ++ addedEffects )
+        )
 
 
 {-| Sends the supplied `msg` into appliication under test. This is how `ports` and `Subscriptions` should be simulated.
