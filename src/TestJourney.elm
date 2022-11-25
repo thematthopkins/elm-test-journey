@@ -1126,12 +1126,12 @@ listDiffToString index description { expected, actual } originals =
             ]
                 |> String.join ""
 
-        ( first :: _, [] ) ->
+        ( _ :: _, [] ) ->
             verticalBar (description ++ " was shorter than")
                 (toStringLists originals.originalExpected)
                 (toStringLists originals.originalActual)
 
-        ( [], first :: _ ) ->
+        ( [], _ :: _ ) ->
             verticalBar (description ++ " was longer than")
                 (toStringLists originals.originalExpected)
                 (toStringLists originals.originalActual)
