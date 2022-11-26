@@ -12,17 +12,42 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-
     steps:
       - uses: actions/checkout@v2
 
-      - name: Install elm, elm-format and cache the ELM_HOME directory
-        uses: mpizenberg/elm-tooling-action@v1.2
+      - name: Use Node.js
+        uses: actions/setup-node@v1
         with:
-          cache-key: elm-home-${{ hashFiles('elm-tooling.json', 'elm.json') }}
+          node-version: 14
 
-      - name: Making sure the installation worked
-        run: npx elm --version
+      - uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: npm dependencies
+        env: 
+          NO_ELM_TOOLING_INSTALL: true
+        run: |
+            npm install
+
+      - uses: actions/cache@v1
+        id: elm-cache
+        with:
+          path: ~/.elm
+          key: ${{ runner.os }}-elm--home-${{ hashFiles('elm-tooling.json', '**/elm.json') }}-$({})
+
+      - name: install elm-tools
+        run: |
+            npx elm-tooling install
+
+      - name: install elm
+        env: 
+          NO_ELM_TOOLING_INSTALL: true
+        run: |
+            npm install -g elm-analyse 
 
       - name: elm make
         run: |
@@ -30,13 +55,9 @@ jobs:
 
       - name: elm test examples
         run: |
-            npx elm-test-rs && cd examples && npx elm-test-rs elm-test && cd ..
+            npx elm-test-rs && cd examples && npx elm-test-rs && cd ..
 
       - name: elm-analyse
         run: |
-            npm install -g elm-analyse
-
-      - name: elm-analyse
-        run: |
-            elm-analyse && cd examples && elm-analyse && cd ..
+            npx elm-analyse && cd examples && npx elm-analyse && cd ..
 
