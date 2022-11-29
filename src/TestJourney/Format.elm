@@ -1,6 +1,6 @@
 module TestJourney.Format exposing (format)
 
-import Test.Runner.Failure
+import Test.Runner.Failure exposing (InvalidReason(..), Reason(..))
 
 verticalBar : String -> String -> String -> String
 verticalBar comparison expected actual =
@@ -72,32 +72,32 @@ listDiffToString index description { expected, actual } originals =
                     , "` was expected."
                     ]
 
-format : String -> Test.Runner.Failure.Reason -> String
+format : String -> Reason -> String
 format description reason =
     case reason of
-        Test.Runner.Failure.Custom ->
+        Custom ->
             description
 
-        Test.Runner.Failure.Equality e a ->
+        Equality e a ->
             verticalBar description e a
 
-        Test.Runner.Failure.Comparison e a ->
+        Comparison e a ->
             verticalBar description e a
 
-        Test.Runner.Failure.TODO ->
+        TODO ->
             description
 
-        Test.Runner.Failure.Invalid Test.Runner.Failure.BadDescription ->
+        Invalid BadDescription ->
             if description == "" then
                 "The empty string is not a valid test description."
 
             else
                 "This is an invalid test description: " ++ description
 
-        Test.Runner.Failure.Invalid _ ->
+        Invalid _ ->
             description
 
-        Test.Runner.Failure.ListDiff expected actual ->
+        ListDiff expected actual ->
             listDiffToString 0
                 description
                 { expected = expected
@@ -107,7 +107,7 @@ format description reason =
                 , originalActual = actual
                 }
 
-        Test.Runner.Failure.CollectionDiff { expected, actual, extra, missing } ->
+        CollectionDiff { expected, actual, extra, missing } ->
             let
                 extraStr =
                     if List.isEmpty extra then
