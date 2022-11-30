@@ -75,6 +75,7 @@ import Test.Runner
 import Test.Runner.Failure
 import TestJourney.Internal exposing (Finder(..), FinderPart(..))
 import TestJourney.Page as Page
+import TestJourney.Format
 import Url
 
 
@@ -1028,7 +1029,7 @@ expectationToFailure =
 
 failureToExpectation : Failure -> Expect.Expectation
 failureToExpectation f =
-    Expect.fail (Test.Runner.Failure.format f.description f.reason)
+    Expect.fail (TestJourney.Format.format f.description f.reason)
 
 
 type alias StepDescription =
@@ -1090,7 +1091,6 @@ stepSimulateEvent description event finder =
                     )
         )
 
-
 failureWithStepsDescription :
     List StepDescription
     -> StepDescription
@@ -1099,7 +1099,7 @@ failureWithStepsDescription :
 failureWithStepsDescription passedSteps failedStep failure =
     passedSteps
         |> List.map (\s -> "✓ " ++ s)
-        |> (\l -> l ++ [ "✗ " ++ failedStep ++ ":\n" ++ Test.Runner.Failure.format failure.description failure.reason ])
+        |> (\l -> l ++ [ "✗ " ++ failedStep ++ ":\n" ++ TestJourney.Format.format failure.description failure.reason ])
         |> String.join "\n"
         |> failureFromDescription
 

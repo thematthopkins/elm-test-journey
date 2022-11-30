@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "postinstall": "elm-tooling install"
+  },
+  "devDependencies": {
+    "elm-tooling": "^1.10.0"
+  }
+}

@@ -12,41 +12,52 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Use Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: 14
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: install elm
+      - name: npm dependencies
+        env: 
+          NO_ELM_TOOLING_INSTALL: true
         run: |
-            npm install -g elm elm-analyse elm-test
+            npm install
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         id: elm-cache
         with:
           path: ~/.elm
-          key: ${{ runner.os }}-elm--home-${{ hashFiles('**/elm.json') }}
+          key: ${{ runner.os }}-elm--home-${{ hashFiles('elm-tooling.json', '**/elm.json') }}-$({})
+
+      - name: install elm-tools
+        run: |
+            npx elm-tooling install
+
+      - name: install elm
+        env: 
+          NO_ELM_TOOLING_INSTALL: true
+        run: |
+            npm install -g elm-analyse 
 
       - name: elm make
         run: |
-            elm make --output /dev/null && cd examples && elm make src/*.elm --output /dev/null && cd ..
+            npx elm make --output /dev/null && cd examples && npx elm make src/*.elm --output /dev/null && cd ..
 
       - name: elm test examples
         run: |
-            elm-test && cd examples && elm-test && cd ..
+            npx elm-test-rs && cd examples && npx elm-test-rs && cd ..
 
       - name: elm-analyse
         run: |
-            elm-analyse && cd examples && elm-analyse && cd ..
+            npx elm-analyse && cd examples && npx elm-analyse && cd ..
 
