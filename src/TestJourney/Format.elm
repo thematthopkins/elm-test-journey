@@ -2,6 +2,8 @@ module TestJourney.Format exposing (format)
 
 {-| This is implemented by elm-exploration/test, but not exposed.
 All lines below are copied in from <https://github.com/elm-explorations/test/blob/master/tests/src/Runner/String/Format.elm>
+This version if from commit 7b4679cd8a8f6efeb956a1d3424751ad05127fde
+Update that commit hash comment and all lines below here with a copy when updating.
 -}
 
 import Diff exposing (Change(..))
